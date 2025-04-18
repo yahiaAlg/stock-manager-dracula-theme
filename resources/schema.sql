@@ -150,17 +150,17 @@ INSERT OR IGNORE INTO OrderItem (order_id, product_id, quantity, unit_price) VAL
 INSERT OR IGNORE INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (9, 9, 7, 29.99);
 INSERT OR IGNORE INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (10, 10, 3, 34.99);
 
--- ========== Report ==========
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Stock Summary', '2025-04-01', '{"category":"Electronics"}', 'reports/stock_summary_2025-04-01.pdf');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Sales Summary', '2025-04-02', '{"start":"2025-04-01","end":"2025-04-02"}', 'reports/sales_summary_2025-04-02.csv');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Customer Orders', '2025-04-03', '{"customerId":3}', 'reports/customer_3_orders_2025-04-03.pdf');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Top Products', '2025-04-04', '{"limit":5}', 'reports/top5_products_2025-04-04.pdf');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Low Stock', '2025-04-05', '{}', 'reports/low_stock_2025-04-05.csv');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Inventory Adj', '2025-04-06', '{"date":"2025-04-06"}', 'reports/inv_adj_2025-04-06.pdf');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Sales by Cust', '2025-04-07', '{"groupBy":"customer"}', 'reports/sales_by_customer_2025-04-07.csv');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Monthly Sales', '2025-04-08', '{"month":"2025-03"}', 'reports/monthly_sales_2025-03.pdf');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Category Sales', '2025-04-09', '{"category":"Books"}', 'reports/books_sales_2025-04-09.pdf');
-INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Year-End', '2025-04-10', '{"year":2024}', 'reports/year_end_2024.pdf');
+-- -- ========== Report ==========
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Stock Summary', '2025-04-01', '{"category":"Electronics"}', 'reports/stock_summary_2025-04-01.pdf');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Sales Summary', '2025-04-02', '{"start":"2025-04-01","end":"2025-04-02"}', 'reports/sales_summary_2025-04-02.csv');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Customer Orders', '2025-04-03', '{"customerId":3}', 'reports/customer_3_orders_2025-04-03.pdf');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Top Products', '2025-04-04', '{"limit":5}', 'reports/top5_products_2025-04-04.pdf');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Low Stock', '2025-04-05', '{}', 'reports/low_stock_2025-04-05.csv');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Inventory Adj', '2025-04-06', '{"date":"2025-04-06"}', 'reports/inv_adj_2025-04-06.pdf');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Sales by Cust', '2025-04-07', '{"groupBy":"customer"}', 'reports/sales_by_customer_2025-04-07.csv');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Monthly Sales', '2025-04-08', '{"month":"2025-03"}', 'reports/monthly_sales_2025-03.pdf');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Category Sales', '2025-04-09', '{"category":"Books"}', 'reports/books_sales_2025-04-09.pdf');
+-- INSERT OR IGNORE INTO Report (report_type, generated_on, parameters, file_path) VALUES ('Year-End', '2025-04-10', '{"year":2024}', 'reports/year_end_2024.pdf');
 
 -- ========== InventoryAdjustment ==========
 INSERT OR IGNORE INTO InventoryAdjustment (product_id, date, change_qty, reason) VALUES (1, '2025-04-01', -5, 'Damaged in transit');

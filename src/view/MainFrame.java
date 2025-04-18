@@ -163,7 +163,7 @@ public class MainFrame extends JFrame {
     public static void main(String[] args) {
         // Set system look and feel
         try {
-            UIManager.setLookAndFeel("com.formdev.flatlaf.intellijthemes.FlatDraculaIJTheme");
+            UIManager.setLookAndFeel("com.formdev.flatlaf.intellijthemes.FlatGradiantoMidnightBlueIJTheme");
         } catch (Exception e) {
             e.printStackTrace();
         }

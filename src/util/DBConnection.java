@@ -53,7 +53,7 @@ public class DBConnection {
     private static void initializeDatabase() {
         try {
             String rootPath = new File(".").getCanonicalPath();
-            String schemaPath = rootPath + "/stock-manager/resources/schema.sql";
+            String schemaPath = rootPath + "/resources/schema.sql";
             System.out.println("Loading schema from: " + schemaPath);
             
             // Read the file and execute each statement individually
