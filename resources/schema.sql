@@ -1,5 +1,17 @@
 -- Database schema for Stock Management System
 
+-- User management table
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    email TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'User',
+    active BOOLEAN NOT NULL DEFAULT 1
+);
+
+
 -- Category table
 CREATE TABLE IF NOT EXISTS Category (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
