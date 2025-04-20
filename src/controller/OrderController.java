@@ -53,13 +53,17 @@ public class OrderController {
     /**
      * Search orders by criteria
      */
-    public List<Order> searchOrders(Integer customerId, String status, Date startDate, Date endDate) {
+    public List<Order> searchOrders(Integer customerId, String status, Date startDate, Date endDate, String searchTerm) {
         StringBuilder sql = new StringBuilder();
         List<Object> params = new ArrayList<>();
         
-        sql.append("SELECT o.*, c.name as customer_name ");
+        // We need to join with OrderItem and Product tables to search by product name and category
+        sql.append("SELECT DISTINCT o.id, o.customer_id, o.order_date, o.total_amount, o.status, c.name as customer_name ");
         sql.append("FROM \"Order\" o ");
         sql.append("LEFT JOIN Customer c ON o.customer_id = c.id ");
+        sql.append("LEFT JOIN OrderItem oi ON o.id = oi.order_id ");
+        sql.append("LEFT JOIN Product p ON oi.product_id = p.id ");
+        sql.append("LEFT JOIN Category cat ON p.category_id = cat.id ");
         
         // Build WHERE clause
         boolean hasWhere = false;
@@ -95,8 +99,23 @@ public class OrderController {
                 sql.append("AND o.order_date <= ? ");
             } else {
                 sql.append("WHERE o.order_date <= ? ");
+                hasWhere = true;
             }
             params.add(DATE_FORMAT.format(endDate));
+        }
+        
+        // Add search term for customer name, product name, or product category
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            String likeParam = "%" + searchTerm.trim() + "%";
+            if (hasWhere) {
+                sql.append("AND (c.name LIKE ? OR p.name LIKE ? OR cat.name LIKE ?) ");
+            } else {
+                sql.append("WHERE (c.name LIKE ? OR p.name LIKE ? OR cat.name LIKE ?) ");
+                hasWhere = true;
+            }
+            params.add(likeParam);
+            params.add(likeParam);
+            params.add(likeParam);
         }
         
         sql.append("ORDER BY o.order_date DESC");
@@ -121,7 +140,7 @@ public class OrderController {
                 return order;
             }
         }, params.toArray());
-    }
+    }    
     
     /**
      * Get an order by ID with all its items
@@ -191,71 +210,172 @@ public class OrderController {
      */
     public boolean saveOrder(Order order) {
         try {
+            System.out.println("DEBUG: Starting order save process for order ID: " + order.getId());
+            
             // Begin transaction
             DataUtil.beginTransaction();
+            Connection conn = DBConnection.getConnection();
             
-            // Set formatted date string
+            // Set date and calculate total
             if (order.getOrderDate() == null) {
                 order.setOrderDate(new Date());
             }
-            
-            // Calculate total amount
             order.calculateTotal();
+            System.out.println("DEBUG: Order total calculated: " + order.getTotalAmount());
             
+            // Handle existing order
             if (order.getId() > 0) {
-                // Update existing order
-                if (!DataUtil.update("\"Order\"", order, "id")) {
+                System.out.println("DEBUG: Updating existing order #" + order.getId());
+                
+                // Get original order with items
+                Order originalOrder = getOrderById(order.getId());
+                System.out.println("DEBUG: Original order items count: " + originalOrder.getOrderItems().size());
+                
+                // Print original order items
+                System.out.println("DEBUG: Original order items details:");
+                for (OrderItem originalItem : originalOrder.getOrderItems()) {
+                    System.out.println("DEBUG:   Product ID: " + originalItem.getProductId() + 
+                                    ", Quantity: " + originalItem.getQuantity() +
+                                    ", Unit Price: " + originalItem.getUnitPrice());
+                    
+                    // Get current stock level before restoration
+                    String checkStockSql = "SELECT stock_qty FROM Product WHERE id = ?";
+                    PreparedStatement checkStmt = conn.prepareStatement(checkStockSql);
+                    checkStmt.setInt(1, originalItem.getProductId());
+                    ResultSet rs = checkStmt.executeQuery();
+                    int currentStock = 0;
+                    if (rs.next()) {
+                        currentStock = rs.getInt("stock_qty");
+                    }
+                    rs.close();
+                    checkStmt.close();
+                    System.out.println("DEBUG:   Current stock before restore: " + currentStock);
+                    
+                    // First restore all original quantities to stock
+                    String restoreStockSql = "UPDATE Product SET stock_qty = stock_qty + ? WHERE id = ?";
+                    PreparedStatement restoreStmt = conn.prepareStatement(restoreStockSql);
+                    restoreStmt.setInt(1, originalItem.getQuantity());
+                    restoreStmt.setInt(2, originalItem.getProductId());
+                    int rowsAffected = restoreStmt.executeUpdate();
+                    restoreStmt.close();
+                    System.out.println("DEBUG:   Restored " + originalItem.getQuantity() + 
+                                    " units to product ID: " + originalItem.getProductId() + 
+                                    ", Rows affected: " + rowsAffected);
+                    
+                    // Check stock after restoration
+                    checkStmt = conn.prepareStatement(checkStockSql);
+                    checkStmt.setInt(1, originalItem.getProductId());
+                    rs = checkStmt.executeQuery();
+                    if (rs.next()) {
+                        int updatedStock = rs.getInt("stock_qty");
+                        System.out.println("DEBUG:   Stock after restore: " + updatedStock + 
+                                        " (Change: +" + (updatedStock - currentStock) + ")");
+                    }
+                    rs.close();
+                    checkStmt.close();
+                }
+                
+                // Update order record
+                System.out.println("DEBUG: Updating order record");
+                if (!DataUtil.update("\"Order\"", order, "id", "customerName", "orderItems")) {
+                    System.out.println("DEBUG: Failed to update order record");
                     DataUtil.rollbackTransaction();
                     return false;
                 }
                 
-                // Delete existing order items
+                // Delete old order items
                 String deleteSql = "DELETE FROM OrderItem WHERE order_id = ?";
-                Connection conn = DBConnection.getConnection();
                 PreparedStatement deleteStmt = conn.prepareStatement(deleteSql);
                 deleteStmt.setInt(1, order.getId());
-                deleteStmt.executeUpdate();
+                int deletedCount = deleteStmt.executeUpdate();
                 deleteStmt.close();
+                System.out.println("DEBUG: Deleted " + deletedCount + " original order items");
+                
             } else {
                 // Insert new order
-                int orderId = DataUtil.insert("\"Order\"", order, "id");
+                System.out.println("DEBUG: Creating new order");
+                int orderId = DataUtil.insert("\"Order\"", order, "id", "customerName", "orderItems");
                 if (orderId <= 0) {
+                    System.out.println("DEBUG: Failed to create new order");
                     DataUtil.rollbackTransaction();
                     return false;
                 }
-                
                 order.setId(orderId);
+                System.out.println("DEBUG: New order created with ID: " + orderId);
             }
             
-            // Insert order items
+            // Print new order items
+            System.out.println("DEBUG: New order items to insert: " + order.getOrderItems().size());
+            for (OrderItem item : order.getOrderItems()) {
+                System.out.println("DEBUG:   Product ID: " + item.getProductId() + 
+                                ", Quantity: " + item.getQuantity() +
+                                ", Unit Price: " + item.getUnitPrice());
+            }
+            
+            // Insert order items and update stock
             for (OrderItem item : order.getOrderItems()) {
                 item.setOrderId(order.getId());
                 
-                int itemId = DataUtil.insert("OrderItem", item, "id");
+                // Get current stock level before deduction
+                String checkStockSql = "SELECT stock_qty FROM Product WHERE id = ?";
+                PreparedStatement checkStmt = conn.prepareStatement(checkStockSql);
+                checkStmt.setInt(1, item.getProductId());
+                ResultSet rs = checkStmt.executeQuery();
+                int currentStock = 0;
+                if (rs.next()) {
+                    currentStock = rs.getInt("stock_qty");
+                }
+                rs.close();
+                checkStmt.close();
+                System.out.println("DEBUG:   Current stock before deduction for product ID " + 
+                                item.getProductId() + ": " + currentStock);
+                
+                // Insert item
+                System.out.println("DEBUG:   Inserting order item for product ID: " + item.getProductId());
+                int itemId = DataUtil.insert("OrderItem", item, "id", "productName");
                 if (itemId <= 0) {
+                    System.out.println("DEBUG:   Failed to insert order item");
                     DataUtil.rollbackTransaction();
                     return false;
                 }
-                
                 item.setId(itemId);
+                System.out.println("DEBUG:   Order item inserted with ID: " + itemId);
                 
-                // Update product stock
+                // Reduce stock quantity
                 String updateStockSql = "UPDATE Product SET stock_qty = stock_qty - ? WHERE id = ?";
-                Connection conn = DBConnection.getConnection();
                 PreparedStatement updateStmt = conn.prepareStatement(updateStockSql);
                 updateStmt.setInt(1, item.getQuantity());
                 updateStmt.setInt(2, item.getProductId());
-                updateStmt.executeUpdate();
+                int rowsAffected = updateStmt.executeUpdate();
                 updateStmt.close();
+                System.out.println("DEBUG:   Deducted " + item.getQuantity() + 
+                                " units from product ID: " + item.getProductId() + 
+                                ", Rows affected: " + rowsAffected);
+                
+                // Check stock after deduction
+                checkStmt = conn.prepareStatement(checkStockSql);
+                checkStmt.setInt(1, item.getProductId());
+                rs = checkStmt.executeQuery();
+                if (rs.next()) {
+                    int updatedStock = rs.getInt("stock_qty");
+                    System.out.println("DEBUG:   Stock after deduction: " + updatedStock + 
+                                    " (Change: -" + (currentStock - updatedStock) + ")");
+                }
+                rs.close();
+                checkStmt.close();
             }
             
             // Commit transaction
             DataUtil.commitTransaction();
+            System.out.println("DEBUG: Transaction committed successfully");
             return true;
         } catch (SQLException e) {
+            System.out.println("DEBUG: SQL Exception occurred: " + e.getMessage());
             try {
                 DataUtil.rollbackTransaction();
+                System.out.println("DEBUG: Transaction rolled back");
             } catch (SQLException ex) {
+                System.out.println("DEBUG: Error during rollback: " + ex.getMessage());
                 ex.printStackTrace();
             }
             e.printStackTrace();

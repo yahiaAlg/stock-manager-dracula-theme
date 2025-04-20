@@ -122,9 +122,24 @@ public class OrderForm extends JDialog {
         
         // Order items table
         String[] columns = {"Product ID", "Product Name", "Quantity", "Unit Price", "Subtotal"};
-        tableModel = new DefaultTableModel(columns, 0);
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                // Only make the quantity column editable
+                return column == 2;
+            }
+        };
         
         itemsTable = new JTable(tableModel);
+        
+        // Add cell editor listener to detect quantity changes
+        itemsTable.getModel().addTableModelListener(e -> {
+            if (e.getColumn() == 2) { // Quantity column
+                int row = e.getFirstRow();
+                updateItemQuantity(row);
+            }
+        });
+        
         JScrollPane scrollPane = new JScrollPane(itemsTable);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Order Items"));
         
@@ -152,6 +167,40 @@ public class OrderForm extends JDialog {
         add(buttonsPanel, BorderLayout.SOUTH);
     }
     
+    private void updateItemQuantity(int row) {
+        if (row >= 0 && row < tableModel.getRowCount()) {
+            try {
+                int productId = (int) tableModel.getValueAt(row, 0);
+                int newQuantity = Integer.parseInt(tableModel.getValueAt(row, 2).toString());
+                // Update the corresponding OrderItem in the order
+                for (OrderItem item : order.getOrderItems()) {
+                    if (item.getProductId() == productId) {
+                        // Update the quantity
+                        item.setQuantity(newQuantity);
+                        
+                        // Update the subtotal in the table
+                        double subtotal = item.getSubtotal();
+                        tableModel.setValueAt(String.format("$%.2f", subtotal), row, 4);
+                        
+                        // Recalculate order total
+                        order.calculateTotal();
+                        updateTotal();
+                        break;
+                    }
+                }
+            } catch (NumberFormatException ex) {
+                // Handle invalid quantity input
+                JOptionPane.showMessageDialog(this, 
+                    "Please enter a valid quantity", 
+                    "Invalid Input", 
+                    JOptionPane.ERROR_MESSAGE);
+                
+                // Reload order items to reset invalid input
+                loadOrderItems();
+            }
+        }
+    }
+    
     private void loadData() {
         // Load customers
         List<Customer> customers = customerController.getAllCustomers();
@@ -176,11 +225,11 @@ public class OrderForm extends JDialog {
             statusCombo.setSelectedItem(order.getStatus());
         }
         
-        // Set total
-        updateTotal();
-        
         // Load order items
         loadOrderItems();
+        
+        // Set total
+        updateTotal();
     }
     
     private void loadOrderItems() {
@@ -207,17 +256,21 @@ public class OrderForm extends JDialog {
         if (selectedProduct != null) {
             // Check if product already exists in order
             boolean exists = false;
-            for (int i = 0; i < tableModel.getRowCount(); i++) {
-                if ((int)tableModel.getValueAt(i, 0) == selectedProduct.getId()) {
+            for (int i = 0; i < order.getOrderItems().size(); i++) {
+                OrderItem item = order.getOrderItems().get(i);
+                if (item.getProductId() == selectedProduct.getId()) {
                     // Increment quantity
-                    int currentQty = Integer.parseInt(tableModel.getValueAt(i, 2).toString());
-                    currentQty++;
-                    tableModel.setValueAt(currentQty, i, 2);
+                    int newQty = item.getQuantity() + 1;
+                    item.setQuantity(newQty);
                     
-                    // Update subtotal
-                    double unitPrice = selectedProduct.getUnitPrice();
-                    double subtotal = unitPrice * currentQty;
-                    tableModel.setValueAt(String.format("$%.2f", subtotal), i, 4);
+                    // Update the table
+                    for (int row = 0; row < tableModel.getRowCount(); row++) {
+                        if ((int)tableModel.getValueAt(row, 0) == item.getProductId()) {
+                            tableModel.setValueAt(newQty, row, 2);
+                            tableModel.setValueAt(String.format("$%.2f", item.getSubtotal()), row, 4);
+                            break;
+                        }
+                    }
                     
                     exists = true;
                     break;
@@ -244,12 +297,10 @@ public class OrderForm extends JDialog {
                 row[4] = String.format("$%.2f", item.getSubtotal());
                 
                 tableModel.addRow(row);
-            } else {
-                // Update order total
-                updateOrderFromTable();
             }
             
             // Update total
+            order.calculateTotal();
             updateTotal();
         }
     }
@@ -260,7 +311,8 @@ public class OrderForm extends JDialog {
             int productId = (int) tableModel.getValueAt(selectedRow, 0);
             
             // Remove from order
-            for (OrderItem item : order.getOrderItems()) {
+            for (int i = 0; i < order.getOrderItems().size(); i++) {
+                OrderItem item = order.getOrderItems().get(i);
                 if (item.getProductId() == productId) {
                     order.removeOrderItem(item);
                     break;
@@ -294,9 +346,6 @@ public class OrderForm extends JDialog {
             
             order.addOrderItem(item);
         }
-        
-        // Update total
-        order.calculateTotal();
     }
     
     private void updateTotal() {
@@ -323,6 +372,9 @@ public class OrderForm extends JDialog {
         // Set status
         order.setStatus(statusCombo.getSelectedItem().toString());
         
+        // Make sure the order items are synced with the table
+        updateOrderFromTable();
+        
         // Save order
         if (orderController.saveOrder(order)) {
             JOptionPane.showMessageDialog(this, "Order saved successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
@@ -331,7 +383,7 @@ public class OrderForm extends JDialog {
             JOptionPane.showMessageDialog(this, "Failed to save order", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
+ 
     // Dialog for selecting products
     private class ProductSelectionDialog extends JDialog {
         

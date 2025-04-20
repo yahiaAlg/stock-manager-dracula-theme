@@ -145,14 +145,19 @@ public class OrderView extends JPanel {
         Customer selectedCustomer = (Customer) customerFilter.getSelectedItem();
         Integer customerId = (selectedCustomer.getId() > 0) ? selectedCustomer.getId() : null;
         
-        // Search orders
-        List<Order> orders = orderController.searchOrders(customerId, status, null, null);
+        // Get search term
+        String searchTerm = searchField.getText().trim();
+        if (searchTerm.isEmpty()) {
+            searchTerm = null;
+        }
+        
+        // Search orders with the new search term parameter
+        List<Order> orders = orderController.searchOrders(customerId, status, null, null, searchTerm);
         
         for (Order order : orders) {
             addOrderToTable(order);
         }
     }
-    
     private void createNewOrder() {
         OrderForm orderForm = new OrderForm(null, orderController, customerController);
         orderForm.setVisible(true);

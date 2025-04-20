@@ -66,7 +66,6 @@ public class DashboardView extends JPanel {
         chartsPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         chartsPanel.setBorder(BorderFactory.createTitledBorder("Analytics"));
         
-        
         // Low stock panel
         lowStockPanel = new JPanel(new BorderLayout(5, 5));
         lowStockPanel.setBorder(BorderFactory.createTitledBorder("Low Stock Items"));
@@ -86,13 +85,22 @@ public class DashboardView extends JPanel {
         JScrollPane scrollPane = new JScrollPane(lowStockTable);
         lowStockPanel.add(scrollPane, BorderLayout.CENTER);
         
-        // Add all panels to the main view
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.add(metricsPanel, BorderLayout.NORTH);
-        topPanel.add(chartsPanel, BorderLayout.CENTER);
+        // Use BorderLayout for better space allocation
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.add(metricsPanel, BorderLayout.NORTH);
         
-        add(topPanel, BorderLayout.CENTER);
-        add(lowStockPanel, BorderLayout.SOUTH);
+        // Set fixed height for chartsPanel
+        chartsPanel.setPreferredSize(new Dimension(800, 350));
+        mainPanel.add(chartsPanel, BorderLayout.CENTER);
+        
+        // Create a split pane to divide space between charts and low stock
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, mainPanel, lowStockPanel);
+        splitPane.setResizeWeight(0.7); // Give 70% of space to the top component
+        splitPane.setDividerLocation(500); // Initial divider location
+        splitPane.setOneTouchExpandable(true);
+        
+        // Add to the main view
+        add(splitPane, BorderLayout.CENTER);
     }
     
     public void refreshData() {
@@ -151,14 +159,17 @@ public class DashboardView extends JPanel {
         // Remove existing charts
         chartsPanel.removeAll();
         
-        // Add sales chart (last 30 days)
+        // Create and add sales chart with proper sizing
         ChartPanel salesChartPanel = new ChartPanel(controller.createSalesChart(30));
         salesChartPanel.setPreferredSize(new Dimension(400, 300));
+        salesChartPanel.setMinimumSize(new Dimension(300, 250));
         
-        // Add product category chart
+        // Create and add category chart with proper sizing
         ChartPanel categoryChartPanel = new ChartPanel(controller.createStockByCategory());
         categoryChartPanel.setPreferredSize(new Dimension(400, 300));
+        categoryChartPanel.setMinimumSize(new Dimension(300, 250));
         
+        // Add charts to panel
         chartsPanel.add(salesChartPanel);
         chartsPanel.add(categoryChartPanel);
         

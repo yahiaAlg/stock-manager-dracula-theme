@@ -158,7 +158,8 @@ public class ReportView extends JPanel {
             }
         }
     }
-    
+
+
     // Custom renderer for view button
     private class ButtonRenderer extends JButton implements javax.swing.table.TableCellRenderer {
         public ButtonRenderer() {

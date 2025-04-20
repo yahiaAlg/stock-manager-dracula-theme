@@ -3,8 +3,6 @@ package view;
 import javax.swing.*;
 
 import controller.*;
-import model.*;
-
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -21,7 +19,9 @@ public class MainFrame extends JFrame {
     private CustomerController customerController;
     private OrderController orderController;
     private ReportController reportController;
-    
+    private CategoryController categoryController;
+    private InventoryAdjustmentController inventoryAdjustmentController;
+
     // Views
     private DashboardView dashboardView;
     private ProductView productView;
@@ -29,7 +29,9 @@ public class MainFrame extends JFrame {
     private CustomerView customerView;
     private OrderView orderView;
     private ReportView reportView;
-    
+    private CategoryView categoryView;
+    private InventoryAdjustmentView inventoryAdjustmentView;
+
     public MainFrame(MainController mainController) {
         setTitle("Stock Manager");
         setSize(1024, 768);
@@ -54,11 +56,13 @@ public class MainFrame extends JFrame {
     private void initControllers() {
         // Initialize all controllers
         dashboardController = new DashboardController();
+        categoryController = new CategoryController();
         productController = new ProductController();
         supplierController = new SupplierController();
         customerController = new CustomerController();
         orderController = new OrderController();
         reportController = new ReportController();
+        inventoryAdjustmentController = new InventoryAdjustmentController();
     }
     
     private void initComponents() {
@@ -67,19 +71,23 @@ public class MainFrame extends JFrame {
         
         // Create placeholder panels for lazy loading
         JPanel dashboardPlaceholder = createPlaceholderPanel("Loading Dashboard...");
+        JPanel categoriesPlaceholder = createPlaceholderPanel("Loading Categories...");
         JPanel productsPlaceholder = createPlaceholderPanel("Loading Products...");
         JPanel suppliersPlaceholder = createPlaceholderPanel("Loading Suppliers...");
         JPanel customersPlaceholder = createPlaceholderPanel("Loading Customers...");
         JPanel ordersPlaceholder = createPlaceholderPanel("Loading Orders...");
         JPanel reportsPlaceholder = createPlaceholderPanel("Loading Reports...");
+        JPanel adjustmentsPlaceholder = createPlaceholderPanel("Loading Inventory Adjustments...");
         
         // Add tabs with placeholders
         tabbedPane.addTab("Dashboard", dashboardPlaceholder);
+        tabbedPane.addTab("Category", categoriesPlaceholder);
         tabbedPane.addTab("Products", productsPlaceholder);
         tabbedPane.addTab("Suppliers", suppliersPlaceholder);
         tabbedPane.addTab("Customers", customersPlaceholder);
         tabbedPane.addTab("Orders", ordersPlaceholder);
         tabbedPane.addTab("Reports", reportsPlaceholder);
+        tabbedPane.addTab("Inventory Adjustments", adjustmentsPlaceholder);
         
         add(tabbedPane, BorderLayout.CENTER);
         
@@ -93,34 +101,46 @@ public class MainFrame extends JFrame {
                         tabbedPane.setComponentAt(0, dashboardView);
                     }
                     break;
-                case 1: // Products
+                case 1: // Categories
+                    if (categoryView == null) {
+                        categoryView = new CategoryView(categoryController);
+                        tabbedPane.setComponentAt(1, categoryView);
+                    }
+                    break;
+                case 2: // Products
                     if (productView == null) {
                         productView = new ProductView(productController);
-                        tabbedPane.setComponentAt(1, productView);
+                        tabbedPane.setComponentAt(2, productView);
                     }
                     break;
-                case 2: // Suppliers
+                case 3: // Suppliers
                     if (supplierView == null) {
                         supplierView = new SupplierView(supplierController);
-                        tabbedPane.setComponentAt(2, supplierView);
+                        tabbedPane.setComponentAt(3, supplierView);
                     }
                     break;
-                case 3: // Customers
+                case 4: // Customers
                     if (customerView == null) {
                         customerView = new CustomerView(customerController);
-                        tabbedPane.setComponentAt(3, customerView);
+                        tabbedPane.setComponentAt(4, customerView);
                     }
                     break;
-                case 4: // Orders
+                case 5: // Orders
                     if (orderView == null) {
                         orderView = new OrderView(orderController, customerController);
-                        tabbedPane.setComponentAt(4, orderView);
+                        tabbedPane.setComponentAt(5, orderView);
                     }
                     break;
-                case 5: // Reports
+                case 6: // Reports
                     if (reportView == null) {
                         reportView = new ReportView(reportController);
-                        tabbedPane.setComponentAt(5, reportView);
+                        tabbedPane.setComponentAt(6, reportView);
+                    }
+                    break;
+                case 7: // Inventory Adjustments
+                    if (inventoryAdjustmentView == null) {
+                        inventoryAdjustmentView = new InventoryAdjustmentView(inventoryAdjustmentController);
+                        tabbedPane.setComponentAt(7, inventoryAdjustmentView);
                     }
                     break;
             }
@@ -138,12 +158,32 @@ public class MainFrame extends JFrame {
                     dashboardView.refreshData();
                 }
                 break;
-            case 1: // Products
-                if (productView != null) {
-                    productView.loadAllProducts();
+            case 1: // Categories
+                if (categoryView != null) {
+                    categoryView.refreshData();
                 }
                 break;
-            // Add similar refresh methods for other tabs
+            case 2: // Products
+                if (productView != null) {
+                    productView.refreshData();
+                }
+                break;
+            case 3: // Suppliers
+                if (supplierView != null) {
+                    supplierView.refreshData();
+                }
+                break;
+            case 4: // Customers
+                if (customerView != null) {
+                    customerView.refreshData();
+                }
+                break;
+
+            case 7: // Inventory Adjustments
+                if (inventoryAdjustmentView != null) {
+                    inventoryAdjustmentView.refreshData();
+                }
+                break;
         }
     }    
     private JPanel createPlaceholderPanel(String message) {

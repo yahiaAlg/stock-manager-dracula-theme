@@ -138,7 +138,10 @@ public class SupplierView extends JPanel {
             tableModel.addRow(rowData);
         }
     }
-    
+
+    public void refreshData() {
+        loadAllSuppliers();
+    }
     private void onSearchButtonClicked(ActionEvent e) {
         String searchTerm = searchField.getText().trim();
         
@@ -360,4 +363,5 @@ public class SupplierView extends JPanel {
         
         dialog.setVisible(true);
     }
+
 }

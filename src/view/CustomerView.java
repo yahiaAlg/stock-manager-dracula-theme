@@ -397,4 +397,8 @@ public class CustomerView extends JPanel {
         
         dialog.setVisible(true);
     }
+
+    public void refreshData() {
+        loadAllCustomers();
+    }
 }

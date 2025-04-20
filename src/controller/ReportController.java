@@ -4,6 +4,13 @@ import model.Report;
 import util.DataUtil;
 import util.DataUtil.ResultSetMapper;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+
+
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -45,8 +52,7 @@ public class ReportController {
         if ("CSV".equalsIgnoreCase(format)) {
             success = generateCsvReport(report);
         } else if ("PDF".equalsIgnoreCase(format)) {
-            // For simplicity, we'll just create a text file
-            success = generateTextReport(report);
+            success = generatePdfReport(report); // Use the new method
         }
         
         if (success) {
@@ -60,7 +66,6 @@ public class ReportController {
         
         return null;
     }
-    
     /**
      * Get all reports
      */
@@ -187,18 +192,49 @@ public class ReportController {
     }
     
     /**
-     * Generate a simple text report file
+     * Generate a PDF report file
      */
-    private boolean generateTextReport(Report report) {
+    private boolean generatePdfReport(Report report) {
         String sql = getReportQuery(report.getReportType(), report.getParameters());
         
-        try (FileWriter writer = new FileWriter(report.getFilePath())) {
-            // Write report header
-            writer.write("Report Type: " + report.getReportType() + "\n");
-            writer.write("Generated On: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(report.getGeneratedOn()) + "\n");
-            writer.write("Parameters: " + report.getParameters() + "\n\n");
+        try {
+            // Create a new PDF document
+            PDDocument document = new PDDocument();
+            PDPage page = new PDPage();
+            document.addPage(page);
             
-            // Execute query and write results
+            // Create a content stream for writing to the PDF
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            
+            // Set fonts - using the correct approach for PDFBox 2.0.33
+            PDType1Font titleFont = PDType1Font.HELVETICA_BOLD;
+            PDType1Font headerFont = PDType1Font.HELVETICA_BOLD;
+            PDType1Font contentFont = PDType1Font.HELVETICA;
+            
+            // Set starting position
+            float yPosition = page.getMediaBox().getHeight() - 50;
+            float margin = 50;
+            float tableWidth = page.getMediaBox().getWidth() - 2 * margin;
+            
+            // Add report title
+            contentStream.beginText();
+            contentStream.setFont(titleFont, 16);
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText(report.getReportType() + " Report");
+            contentStream.endText();
+            
+            yPosition -= 30;
+            
+            // Add report metadata
+            contentStream.beginText();
+            contentStream.setFont(contentFont, 12);
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText("Generated On: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(report.getGeneratedOn()));
+            contentStream.endText();
+            
+            yPosition -= 20;
+            
+            // Execute query and get results
             List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
                 Map<String, Object> row = new java.util.HashMap<>();
                 ResultSetMetaData metaData = rs.getMetaData();
@@ -212,36 +248,77 @@ public class ReportController {
             });
             
             if (!results.isEmpty()) {
-                // Write header
+                // Get column names and calculate column width
                 Map<String, Object> firstRow = results.get(0);
-                for (String columnName : firstRow.keySet()) {
-                    writer.append(columnName).append("\t");
-                }
-                writer.append("\n");
+                String[] columns = firstRow.keySet().toArray(new String[0]);
+                float colWidth = tableWidth / columns.length;
                 
-                // Write separator
-                for (int i = 0; i < firstRow.size() * 15; i++) {
-                    writer.append("-");
-                }
-                writer.append("\n");
+                // Draw table headers
+                contentStream.setFont(headerFont, 12);
+                contentStream.beginText();
+                contentStream.newLineAtOffset(margin, yPosition);
                 
-                // Write data rows
+                for (String column : columns) {
+                    contentStream.showText(column);
+                    contentStream.newLineAtOffset(colWidth, 0);
+                }
+                contentStream.endText();
+                
+                yPosition -= 20;
+                
+                // Draw a line under headers
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(margin + tableWidth, yPosition);
+                contentStream.stroke();
+                
+                yPosition -= 15;
+                
+                // Draw data rows
+                contentStream.setFont(contentFont, 10);
+                
                 for (Map<String, Object> row : results) {
-                    for (Object value : row.values()) {
-                        String valueStr = (value != null) ? value.toString() : "";
-                        writer.append(valueStr).append("\t");
+                    // Check if we need a new page
+                    if (yPosition < 100) {
+                        contentStream.close();
+                        page = new PDPage();
+                        document.addPage(page);
+                        contentStream = new PDPageContentStream(document, page);
+                        contentStream.setFont(contentFont, 10);
+                        yPosition = page.getMediaBox().getHeight() - 50;
                     }
-                    writer.append("\n");
+                    
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(margin, yPosition);
+                    
+                    for (String column : columns) {
+                        Object value = row.get(column);
+                        String text = value != null ? value.toString() : "";
+                        // Truncate text if too long for column
+                        if (text.length() > 15) {
+                            text = text.substring(0, 12) + "...";
+                        }
+                        contentStream.showText(text);
+                        contentStream.newLineAtOffset(colWidth, 0);
+                    }
+                    
+                    contentStream.endText();
+                    yPosition -= 15;
                 }
             }
             
+            // Close the content stream
+            contentStream.close();
+            
+            // Save the document
+            document.save(report.getFilePath());
+            document.close();
+            
             return true;
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
     }
-    
     /**
      * Get SQL query for the report type
      */

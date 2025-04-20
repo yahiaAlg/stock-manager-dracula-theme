@@ -181,7 +181,10 @@ public class ProductView extends JPanel {
             supplierComboBox.addItem(supplier);
         }
     }
-    
+
+    public void refreshData() {
+        loadAllProducts();
+    }
     private void onSearchButtonClicked(ActionEvent e) {
         String searchTerm = searchField.getText().trim();
         Category selectedCategory = (Category) categoryComboBox.getSelectedItem();
