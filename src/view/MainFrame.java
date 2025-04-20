@@ -9,6 +9,13 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import util.DBConnection;
 
 public class MainFrame extends JFrame {
@@ -166,8 +173,158 @@ public class MainFrame extends JFrame {
             }
         });
         
+        // Add Import Sample Data button at the bottom
+        JButton importSamplesButton = new JButton("Import Sample Data");
+        importSamplesButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                importSampleData();
+            }
+        });
+        
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(importSamplesButton);
+        add(buttonPanel, BorderLayout.SOUTH);
+        
         // Initialize the first tab (Dashboard) immediately
         tabbedPane.setSelectedIndex(0);
+    }
+    
+    private void importSampleData() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select SQL Sample File");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            public boolean accept(File f) {
+                return f.isDirectory() || f.getName().toLowerCase().endsWith(".sql");
+            }
+            public String getDescription() {
+                return "SQL Files (*.sql)";
+            }
+        });
+        
+        // Try to set initial directory to resources folder
+        try {
+            String rootPath = new File(".").getCanonicalPath();
+            File resourcesDir = new File(rootPath + "/resources");
+            if (resourcesDir.exists()) {
+                fileChooser.setCurrentDirectory(resourcesDir);
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+        
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            executeSqlFile(selectedFile);
+        }
+    }
+    
+    private void executeSqlFile(File file) {
+        try {
+            // Show progress dialog
+            JDialog progressDialog = new JDialog(this, "Importing Sample Data", true);
+            JProgressBar progressBar = new JProgressBar();
+            progressBar.setIndeterminate(true);
+            JLabel statusLabel = new JLabel("Reading SQL file...", JLabel.CENTER);
+            
+            progressDialog.setLayout(new BorderLayout());
+            progressDialog.add(statusLabel, BorderLayout.CENTER);
+            progressDialog.add(progressBar, BorderLayout.SOUTH);
+            progressDialog.setSize(300, 100);
+            progressDialog.setLocationRelativeTo(this);
+            
+            // Run the SQL execution in a background thread
+            new Thread(() -> {
+                Connection conn = null;
+                try {
+                    conn = DBConnection.getConnection();
+                    conn.setAutoCommit(false);
+                    
+                    try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                        StringBuilder currentStatement = new StringBuilder();
+                        String line;
+                        int statementCount = 0;
+                        
+                        SwingUtilities.invokeLater(() -> statusLabel.setText("Executing SQL statements..."));
+                        
+                        while ((line = reader.readLine()) != null) {
+                            // Skip comments
+                            if (line.trim().startsWith("--")) {
+                                continue;
+                            }
+                            
+                            // Add the line to the current statement
+                            currentStatement.append(line).append(" ");
+                            
+                            // If the line has a semicolon, execute the statement
+                            if (line.trim().endsWith(";")) {
+                                String sql = currentStatement.toString().trim();
+                                if (!sql.isEmpty()) {
+                                    try (Statement stmt = conn.createStatement()) {
+                                        stmt.execute(sql);
+                                        statementCount++;
+                                        final int count = statementCount;
+                                        SwingUtilities.invokeLater(() -> 
+                                            statusLabel.setText("Executed " + count + " statements..."));
+                                    } catch (SQLException ex) {
+                                        System.err.println("Error executing: " + sql);
+                                        System.err.println("Error message: " + ex.getMessage());
+                                    }
+                                }
+                                currentStatement = new StringBuilder();
+                            }
+                        }
+                        
+                        conn.commit();
+                        
+                        final int totalCount = statementCount;
+                        SwingUtilities.invokeLater(() -> {
+                            progressDialog.dispose();
+                            JOptionPane.showMessageDialog(MainFrame.this, 
+                                "Successfully imported " + totalCount + " SQL statements.",
+                                "Import Complete", JOptionPane.INFORMATION_MESSAGE);
+                            
+                            // Refresh the currently active view
+                            refreshCurrentTab();
+                        });
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    SwingUtilities.invokeLater(() -> {
+                        progressDialog.dispose();
+                        JOptionPane.showMessageDialog(MainFrame.this,
+                            "Error importing sample data: " + ex.getMessage(),
+                            "Import Failed", JOptionPane.ERROR_MESSAGE);
+                    });
+                    
+                    if (conn != null) {
+                        try {
+                            conn.rollback();
+                        } catch (SQLException rollbackEx) {
+                            rollbackEx.printStackTrace();
+                        }
+                    }
+                } finally {
+                    if (conn != null) {
+                        try {
+                            conn.setAutoCommit(true);
+                        } catch (SQLException autoCommitEx) {
+                            autoCommitEx.printStackTrace();
+                        }
+                    }
+                }
+            }).start();
+            
+            // Show the progress dialog after starting the thread
+            progressDialog.setVisible(true);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                "Error importing sample data: " + e.getMessage(),
+                "Import Failed", JOptionPane.ERROR_MESSAGE);
+        }
     }
     
     private void createMenuBar() {
@@ -175,11 +332,18 @@ public class MainFrame extends JFrame {
         
         // Create File menu
         JMenu fileMenu = new JMenu("File");
+        JMenuItem importSamplesMenuItem = new JMenuItem("Import Sample Data");
         JMenuItem exitMenuItem = new JMenuItem("Exit");
+        
+        importSamplesMenuItem.addActionListener(e -> importSampleData());
+        
         exitMenuItem.addActionListener(e -> {
             DBConnection.closeConnection();
             System.exit(0);
         });
+        
+        fileMenu.add(importSamplesMenuItem);
+        fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         
         // Create User menu
@@ -284,7 +448,7 @@ public class MainFrame extends JFrame {
                 }
                 break;
         }
-    }    
+    }
     
     private JPanel createPlaceholderPanel(String message) {
         JPanel panel = new JPanel(new BorderLayout());
