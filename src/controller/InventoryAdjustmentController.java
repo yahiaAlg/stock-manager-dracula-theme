@@ -19,7 +19,8 @@ import java.util.List;
 public class InventoryAdjustmentController {
     
     private ProductController productController;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+    private SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     
     public InventoryAdjustmentController() {
         this.productController = new ProductController();
@@ -247,11 +248,17 @@ public class InventoryAdjustmentController {
                     String dateStr = rs.getString("date");
                     if (dateStr != null) {
                         try {
-                            adjustment.setDate(dateFormat.parse(dateStr));
+                            // Try parsing with dateTimeFormat first
+                            adjustment.setDate(dateTimeFormat.parse(dateStr));
                         } catch (ParseException e) {
-                            // If standard format fails, try alternative formats
-                            adjustment.setDate(new Date()); // Default to current date if parsing fails
-                            System.err.println("Error parsing date: " + dateStr + " - " + e.getMessage());
+                            try {
+                                // If that fails, try with simple date format
+                                adjustment.setDate(dateFormat.parse(dateStr));
+                            } catch (ParseException e2) {
+                                // If both fail, default to current date
+                                adjustment.setDate(new Date());
+                                System.err.println("Error parsing date: " + dateStr + " - " + e2.getMessage());
+                            }
                         }
                     } else {
                         adjustment.setDate(new Date());

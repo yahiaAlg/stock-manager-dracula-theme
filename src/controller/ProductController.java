@@ -44,7 +44,7 @@ public class ProductController {
             }
         });
     }
-    
+
     /**
      * Get products that match search criteria
      */
@@ -191,12 +191,22 @@ public class ProductController {
             // Begin transaction
             DataUtil.beginTransaction();
             
-            // Update product stock
+            // Get the product by ID to get its current stock quantity
             Product product = getProductById(productId);
             if (product != null) {
-                product.setStockQty(product.getStockQty() + changeQty);
+                // Create a new product object with only the fields needed for the update
+                Product updateProduct = new Product();
+                updateProduct.setId(productId);
+                updateProduct.setSku(product.getSku());
+                updateProduct.setName(product.getName());
+                updateProduct.setCategoryId(product.getCategoryId());
+                updateProduct.setSupplierId(product.getSupplierId());
+                updateProduct.setUnitPrice(product.getUnitPrice());
+                updateProduct.setStockQty(product.getStockQty() + changeQty);
+                updateProduct.setReorderLevel(product.getReorderLevel());
                 
-                if (!DataUtil.update("Product", product, "id")) {
+                // Update product stock
+                if (!DataUtil.update("Product", updateProduct, "id")) {
                     DataUtil.rollbackTransaction();
                     return false;
                 }
