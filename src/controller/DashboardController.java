@@ -6,9 +6,14 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.data.general.DefaultPieDataset;
+import org.jfree.data.time.Day;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
 import util.DataUtil;
 import util.DataUtil.ResultSetMapper;
-
+import org.jfree.data.statistics.HistogramDataset;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
@@ -209,4 +214,491 @@ public class DashboardController {
                 false
         );
     }
+    
+    /**
+     * Create an inventory trend chart showing stock level changes over time
+     */
+    public JFreeChart createInventoryTrendChart(int days) {
+        TimeSeriesCollection dataset = new TimeSeriesCollection();
+        TimeSeries series = new TimeSeries("Inventory Level");
+        
+        // Get inventory adjustment history for the past 'days' days
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        
+        // Go back 'days' days
+        cal.add(Calendar.DAY_OF_MONTH, -days);
+        
+        // Get current total stock level
+        String currentStockSql = "SELECT SUM(stock_qty) FROM Product";
+        Object currentStock = DataUtil.queryScalar(currentStockSql);
+        double totalStock = (currentStock == null) ? 0.0 : ((Number) currentStock).doubleValue();
+        
+        // For each day, add a data point based on inventory adjustments
+        for (int i = 0; i <= days; i++) {
+            Date date = cal.getTime();
+            
+            // Get sum of adjustments for this day
+            String sql = "SELECT SUM(change_qty) FROM InventoryAdjustment WHERE date(date) = date(?)";
+            Object result = DataUtil.queryScalar(sql, DATE_FORMAT.format(date));
+            double change = (result == null) ? 0.0 : ((Number) result).doubleValue();
+            
+            // Add to series
+            series.add(new Day(date), totalStock);
+            
+            // Adjust totalStock for next day's calculation
+            totalStock -= change;
+            
+            cal.add(Calendar.DAY_OF_MONTH, 1);
+        }
+        
+        dataset.addSeries(series);
+        
+        return ChartFactory.createTimeSeriesChart(
+                "Inventory Level Trend",
+                "Date",
+                "Total Stock Quantity",
+                dataset,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a chart showing orders by status
+     */
+    public JFreeChart createOrdersByStatusChart() {
+        DefaultPieDataset dataset = new DefaultPieDataset();
+        
+        String sql = "SELECT status, COUNT(*) as count FROM \"Order\" GROUP BY status";
+        
+        List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", rs.getString("status"));
+            result.put("count", rs.getInt("count"));
+            return result;
+        });
+        
+        for (Map<String, Object> result : results) {
+            dataset.setValue(
+                    (String) result.get("status"),
+                    ((Number) result.get("count")).doubleValue()
+            );
+        }
+        
+        return ChartFactory.createPieChart(
+                "Orders by Status",
+                dataset,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a chart showing sales by supplier
+     */
+    public JFreeChart createSalesBySupplierChart() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        
+        String sql = "SELECT s.name as supplier, SUM(oi.quantity * oi.unit_price) as total " +
+                    "FROM OrderItem oi " +
+                    "JOIN Product p ON oi.product_id = p.id " +
+                    "JOIN Supplier s ON p.supplier_id = s.id " +
+                    "GROUP BY s.name " +
+                    "ORDER BY total DESC";
+        
+        List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("supplier", rs.getString("supplier"));
+            result.put("total", rs.getDouble("total"));
+            return result;
+        });
+        
+        for (Map<String, Object> result : results) {
+            dataset.addValue(
+                    ((Number) result.get("total")).doubleValue(),
+                    "Sales Amount",
+                    (String) result.get("supplier")
+            );
+        }
+        
+        return ChartFactory.createBarChart(
+                "Sales by Supplier",
+                "Supplier",
+                "Total Sales",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+
+    /**
+     * Get product price statistics
+     */
+    public Map<String, Object> getProductPriceStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        String minPriceSql = "SELECT MIN(unit_price) FROM Product";
+        stats.put("minPrice", DataUtil.queryScalar(minPriceSql));
+        
+        String maxPriceSql = "SELECT MAX(unit_price) FROM Product";
+        stats.put("maxPrice", DataUtil.queryScalar(maxPriceSql));
+        
+        String avgPriceSql = "SELECT AVG(unit_price) FROM Product";
+        stats.put("avgPrice", DataUtil.queryScalar(avgPriceSql));
+        
+        // Median price calculation in SQLite is more complex
+        String medianPriceSql = "SELECT unit_price FROM Product ORDER BY unit_price LIMIT 1 OFFSET (SELECT COUNT(*) FROM Product) / 2";
+        stats.put("medianPrice", DataUtil.queryScalar(medianPriceSql));
+        
+        return stats;
+    }
+    
+    /**
+     * Get product stock statistics
+     */
+    public Map<String, Object> getProductStockStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        String minStockSql = "SELECT MIN(stock_qty) FROM Product";
+        stats.put("minStock", DataUtil.queryScalar(minStockSql));
+        
+        String maxStockSql = "SELECT MAX(stock_qty) FROM Product";
+        stats.put("maxStock", DataUtil.queryScalar(maxStockSql));
+        
+        String avgStockSql = "SELECT AVG(stock_qty) FROM Product";
+        stats.put("avgStock", DataUtil.queryScalar(avgStockSql));
+        
+        String totalStockSql = "SELECT SUM(stock_qty) FROM Product";
+        stats.put("totalStock", DataUtil.queryScalar(totalStockSql));
+        
+        String zeroStockSql = "SELECT COUNT(*) FROM Product WHERE stock_qty = 0";
+        stats.put("zeroStock", DataUtil.queryScalar(zeroStockSql));
+        
+        return stats;
+    }
+    
+    /**
+     * Create a histogram chart of product prices
+     */
+    public JFreeChart createProductPriceHistogram() {
+        HistogramDataset dataset = new HistogramDataset();
+        
+        String sql = "SELECT unit_price FROM Product";
+        List<Double> prices = DataUtil.query(sql, rs -> rs.getDouble("unit_price"));
+        
+        double[] priceArray = new double[prices.size()];
+        for (int i = 0; i < prices.size(); i++) {
+            priceArray[i] = prices.get(i);
+        }
+        
+        dataset.addSeries("Unit Price", priceArray, 10);
+        
+        return ChartFactory.createHistogram(
+                "Product Price Distribution",
+                "Price Range",
+                "Frequency",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a chart showing product count by category
+     */
+    public JFreeChart createProductsByCategory() {
+        DefaultPieDataset dataset = new DefaultPieDataset();
+        
+        String sql = "SELECT c.name, COUNT(*) as count FROM Product p " +
+                     "JOIN Category c ON p.category_id = c.id " +
+                     "GROUP BY c.name ORDER BY count DESC";
+        
+        List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("name", rs.getString("name"));
+            result.put("count", rs.getInt("count"));
+            return result;
+        });
+        
+        for (Map<String, Object> result : results) {
+            dataset.setValue(
+                    (String) result.get("name"),
+                    ((Number) result.get("count")).doubleValue()
+            );
+        }
+        
+        return ChartFactory.createPieChart(
+                "Products by Category",
+                dataset,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a chart showing product count by supplier
+     */
+    public JFreeChart createProductsBySupplier() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        
+        String sql = "SELECT s.name, COUNT(*) as count FROM Product p " +
+                     "JOIN Supplier s ON p.supplier_id = s.id " +
+                     "GROUP BY s.name ORDER BY count DESC";
+        
+        List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("name", rs.getString("name"));
+            result.put("count", rs.getInt("count"));
+            return result;
+        });
+        
+        for (Map<String, Object> result : results) {
+            dataset.addValue(
+                    ((Number) result.get("count")).doubleValue(),
+                    "Product Count",
+                    (String) result.get("name")
+            );
+        }
+        
+        return ChartFactory.createBarChart(
+                "Products by Supplier",
+                "Supplier",
+                "Count",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a scatter plot of product price vs. stock quantity
+     */
+    public JFreeChart createPriceVsStockChart() {
+        XYSeriesCollection dataset = new XYSeriesCollection();
+        XYSeries series = new XYSeries("Products");
+        
+        String sql = "SELECT name, unit_price, stock_qty FROM Product";
+        
+        List<Product> products = DataUtil.query(sql, rs -> {
+            Product product = new Product();
+            product.setName(rs.getString("name"));
+            product.setUnitPrice(rs.getDouble("unit_price"));
+            product.setStockQty(rs.getInt("stock_qty"));
+            return product;
+        });
+        
+        for (Product product : products) {
+            series.add(product.getUnitPrice(), product.getStockQty());
+        }
+        
+        dataset.addSeries(series);
+        
+        return ChartFactory.createScatterPlot(
+                "Price vs. Stock Quantity",
+                "Unit Price",
+                "Stock Quantity",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Get order statistics for the Order Analysis tab
+     */
+    public Map<String, Object> getOrderStats() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        String totalOrdersSql = "SELECT COUNT(*) FROM \"Order\"";
+        stats.put("totalOrders", DataUtil.queryScalar(totalOrdersSql));
+        
+        String avgOrderValueSql = "SELECT AVG(total_amount) FROM \"Order\"";
+        stats.put("avgOrderValue", DataUtil.queryScalar(avgOrderValueSql));
+        
+        String maxOrderValueSql = "SELECT MAX(total_amount) FROM \"Order\"";
+        stats.put("maxOrderValue", DataUtil.queryScalar(maxOrderValueSql));
+        
+        String totalRevenueSql = "SELECT SUM(total_amount) FROM \"Order\"";
+        stats.put("totalRevenue", DataUtil.queryScalar(totalRevenueSql));
+        
+        String avgItemsPerOrderSql = "SELECT AVG(item_count) FROM " +
+                                    "(SELECT order_id, COUNT(*) as item_count FROM OrderItem GROUP BY order_id)";
+        stats.put("avgItemsPerOrder", DataUtil.queryScalar(avgItemsPerOrderSql));
+        
+        return stats;
+    }
+    
+    /**
+     * Get orders by date range
+     */
+    public Map<String, Object> getOrdersByDateRange() {
+        Map<String, Object> stats = new HashMap<>();
+        
+        String todayOrdersSql = "SELECT COUNT(*), SUM(total_amount) FROM \"Order\" WHERE date(order_date) = date('now')";
+        List<Map<String, Object>> todayResults = DataUtil.query(todayOrdersSql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("count", rs.getInt(1));
+            result.put("total", rs.getDouble(2));
+            return result;
+        });
+        
+        if (!todayResults.isEmpty()) {
+            stats.put("todayCount", todayResults.get(0).get("count"));
+            stats.put("todayTotal", todayResults.get(0).get("total"));
+        }
+        
+        String weekOrdersSql = "SELECT COUNT(*), SUM(total_amount) FROM \"Order\" WHERE order_date >= date('now', '-7 days')";
+        List<Map<String, Object>> weekResults = DataUtil.query(weekOrdersSql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("count", rs.getInt(1));
+            result.put("total", rs.getDouble(2));
+            return result;
+        });
+        
+        if (!weekResults.isEmpty()) {
+            stats.put("weekCount", weekResults.get(0).get("count"));
+            stats.put("weekTotal", weekResults.get(0).get("total"));
+        }
+        
+        String monthOrdersSql = "SELECT COUNT(*), SUM(total_amount) FROM \"Order\" WHERE order_date >= date('now', '-30 days')";
+        List<Map<String, Object>> monthResults = DataUtil.query(monthOrdersSql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("count", rs.getInt(1));
+            result.put("total", rs.getDouble(2));
+            return result;
+        });
+        
+        if (!monthResults.isEmpty()) {
+            stats.put("monthCount", monthResults.get(0).get("count"));
+            stats.put("monthTotal", monthResults.get(0).get("total"));
+        }
+        
+        return stats;
+    }
+    
+    /**
+     * Create a chart showing orders by customer
+     */
+    public JFreeChart createOrdersByCustomer() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        
+        String sql = "SELECT c.name, COUNT(*) as order_count " +
+                    "FROM \"Order\" o " +
+                    "JOIN Customer c ON o.customer_id = c.id " +
+                    "GROUP BY c.name " +
+                    "ORDER BY order_count DESC " +
+                    "LIMIT 10";
+        
+        List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("name", rs.getString("name"));
+            result.put("count", rs.getInt("order_count"));
+            return result;
+        });
+        
+        for (Map<String, Object> result : results) {
+            dataset.addValue(
+                    ((Number) result.get("count")).doubleValue(),
+                    "Order Count",
+                    (String) result.get("name")
+            );
+        }
+        
+        return ChartFactory.createBarChart(
+                "Top 10 Customers by Order Count",
+                "Customer",
+                "Orders",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a chart showing order value distribution
+     */
+    public JFreeChart createOrderValueDistribution() {
+        HistogramDataset dataset = new HistogramDataset();
+        
+        String sql = "SELECT total_amount FROM \"Order\"";
+        List<Double> amounts = DataUtil.query(sql, rs -> rs.getDouble("total_amount"));
+        
+        double[] amountArray = new double[amounts.size()];
+        for (int i = 0; i < amounts.size(); i++) {
+            amountArray[i] = amounts.get(i);
+        }
+        
+        dataset.addSeries("Order Value", amountArray, 10);
+        
+        return ChartFactory.createHistogram(
+                "Order Value Distribution",
+                "Order Value",
+                "Frequency",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+    
+    /**
+     * Create a chart showing orders by status over time
+     */
+    public JFreeChart createOrderStatusTrend() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+        
+        // Get the last 6 months
+        String sql = "SELECT strftime('%Y-%m', order_date) as month, status, COUNT(*) as count " +
+                    "FROM \"Order\" " +
+                    "WHERE order_date >= date('now', '-6 months') " +
+                    "GROUP BY month, status " +
+                    "ORDER BY month";
+        
+        List<Map<String, Object>> results = DataUtil.query(sql, rs -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("month", rs.getString("month"));
+            result.put("status", rs.getString("status"));
+            result.put("count", rs.getInt("count"));
+            return result;
+        });
+        
+        for (Map<String, Object> result : results) {
+            dataset.addValue(
+                    ((Number) result.get("count")).doubleValue(),
+                    (String) result.get("status"),
+                    (String) result.get("month")
+            );
+        }
+        
+        return ChartFactory.createLineChart(
+                "Order Status Trend",
+                "Month",
+                "Count",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true,
+                true,
+                false
+        );
+    }
+
+
 }
