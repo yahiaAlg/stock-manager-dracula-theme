@@ -219,6 +219,78 @@ public class MainFrame extends JFrame {
             executeSqlFile(selectedFile);
         }
     }
+
+    private void clearDatabase() {
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                "This will delete ALL data in the database. This action cannot be undone.\nAre you sure you want to continue?",
+                "Clear Database",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        
+        if (choice == JOptionPane.YES_OPTION) {
+            try {
+                // Close the database connection first
+                DBConnection.closeConnection();
+                
+                // Delete the database file
+                File dbFile = new File("stock-manager.db");
+                if (dbFile.exists()) {
+                    if (dbFile.delete()) {
+                        // Get a new connection to regenerate the database
+                        DBConnection.getConnection();
+                        
+                        // Reset the views
+                        dashboardView = null;
+                        categoryView = null;
+                        productView = null;
+                        supplierView = null;
+                        customerView = null;
+                        orderView = null;
+                        reportView = null;
+                        inventoryAdjustmentView = null;
+                        userManagementView = null;
+                        
+                        // Replace with placeholders
+                        for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                            String tabTitle = tabbedPane.getTitleAt(i);
+                            tabbedPane.setComponentAt(i, createPlaceholderPanel("Loading " + tabTitle + "..."));
+                        }
+                        
+                        // Reload the current tab
+                        int selectedIndex = tabbedPane.getSelectedIndex();
+                        tabbedPane.setSelectedIndex(-1); // Force reload
+                        tabbedPane.setSelectedIndex(selectedIndex);
+                        
+                        JOptionPane.showMessageDialog(this, 
+                            "Database has been cleared successfully.",
+                            "Database Cleared", JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        JOptionPane.showMessageDialog(this,
+                            "Could not delete database file. The file may be in use.",
+                            "Operation Failed", JOptionPane.ERROR_MESSAGE);
+                        
+                        // Reconnect to the database
+                        DBConnection.getConnection();
+                    }
+                } else {
+                    // If file doesn't exist, just create a new database
+                    DBConnection.getConnection();
+                    JOptionPane.showMessageDialog(this, 
+                        "A new database has been created.",
+                        "Database Reset", JOptionPane.INFORMATION_MESSAGE);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(this,
+                    "Error clearing database: " + e.getMessage(),
+                    "Operation Failed", JOptionPane.ERROR_MESSAGE);
+                    
+                // Ensure connection is available
+                DBConnection.getConnection();
+            }
+        }
+    }   
     
     private void executeSqlFile(File file) {
         try {
@@ -333,16 +405,18 @@ public class MainFrame extends JFrame {
         // Create File menu
         JMenu fileMenu = new JMenu("File");
         JMenuItem importSamplesMenuItem = new JMenuItem("Import Sample Data");
+        JMenuItem clearDatabaseMenuItem = new JMenuItem("Clear Database");
         JMenuItem exitMenuItem = new JMenuItem("Exit");
         
         importSamplesMenuItem.addActionListener(e -> importSampleData());
-        
+        clearDatabaseMenuItem.addActionListener(e -> clearDatabase());
         exitMenuItem.addActionListener(e -> {
             DBConnection.closeConnection();
             System.exit(0);
         });
         
         fileMenu.add(importSamplesMenuItem);
+        fileMenu.add(clearDatabaseMenuItem);
         fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         
@@ -493,7 +567,7 @@ public class MainFrame extends JFrame {
     public static void main(String[] args) {
         // Set system look and feel
         try {
-            UIManager.setLookAndFeel("com.formdev.flatlaf.intellijthemes.FlatCyanLightIJTheme");
+            UIManager.setLookAndFeel("com.formdev.flatlaf.FlatIntelliJLaf");
         } catch (Exception e) {
             e.printStackTrace();
         }

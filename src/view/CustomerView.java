@@ -1,6 +1,7 @@
 package view;
 
 import controller.CustomerController;
+import controller.OrderController;
 import model.Customer;
 import model.Order;
 
@@ -360,31 +361,36 @@ public class CustomerView extends JPanel {
         JButton viewDetailsButton = new JButton("View Details");
         JButton closeButton = new JButton("Close");
         
+        // Store customer reference for use in lambda
+        Customer customerForOrder = customer;
+
         newOrderButton.addActionListener(e -> {
-            // Create new order functionality would go here
-            // Typically would launch an OrderForm with this customer pre-selected
-            JOptionPane.showMessageDialog(dialog, 
-                "New order functionality not implemented in this view.\nUse the Orders tab to create a new order.",
-                "Information",
-                JOptionPane.INFORMATION_MESSAGE);
+            Order newOrder = new Order();
+            newOrder.setCustomerId(customerForOrder.getId());
+            newOrder.setCustomerName(customerForOrder.getName());
+            dialog.dispose(); // Close the current dialog
+            OrderForm orderForm = new OrderForm(newOrder, new OrderController(), controller);
+            orderForm.setVisible(true);
         });
         
         viewDetailsButton.addActionListener(e -> {
             int selectedRow = orderTable.getSelectedRow();
             if (selectedRow >= 0 && selectedRow < orders.size()) {
-                int orderId = orders.get(selectedRow).getId();
-                // View order details functionality would go here
-                JOptionPane.showMessageDialog(dialog, 
-                    "View order details functionality not implemented in this view.\nUse the Orders tab to view order #" + orderId,
-                    "Information",
-                    JOptionPane.INFORMATION_MESSAGE);
+                Order selectedOrder = orders.get(selectedRow);
+                
+                // Get the complete order with items before displaying
+                OrderController orderController = new OrderController();
+                Order completeOrder = orderController.getOrderById(selectedOrder.getId());
+                
+                OrderForm orderForm = new OrderForm(completeOrder, orderController, controller);
+                orderForm.setViewOnly(false);
+                orderForm.setVisible(true);
             } else {
                 JOptionPane.showMessageDialog(dialog, 
                     "Please select an order to view details.", 
                     "No Selection", JOptionPane.WARNING_MESSAGE);
             }
         });
-        
         closeButton.addActionListener(e -> dialog.dispose());
         
         footerPanel.add(newOrderButton);
@@ -398,6 +404,7 @@ public class CustomerView extends JPanel {
         dialog.setVisible(true);
     }
 
+    
     public void refreshData() {
         loadAllCustomers();
     }

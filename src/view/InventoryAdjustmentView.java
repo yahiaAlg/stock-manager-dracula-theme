@@ -3,7 +3,7 @@ package view;
 import controller.InventoryAdjustmentController;
 import model.InventoryAdjustment;
 import model.Product;
-
+import com.toedter.calendar.JDateChooser;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -11,7 +11,6 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -26,8 +25,8 @@ public class InventoryAdjustmentView extends JPanel {
     
     // Search components
     private JComboBox<Product> productComboBox;
-    private JTextField startDateField;
-    private JTextField endDateField;
+    private JDateChooser startDateChooser;
+    private JDateChooser endDateChooser;
     private JTextField reasonField;
     private JTextField minQtyField;
     private JTextField maxQtyField;
@@ -90,13 +89,19 @@ public class InventoryAdjustmentView extends JPanel {
         // Date range filter
         JPanel datePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         datePanel.add(new JLabel("Date Range:"));
-        startDateField = new JTextField(10);
-        startDateField.setToolTipText("YYYY-MM-DD");
-        datePanel.add(startDateField);
+
+        // Initialize the class fields instead of creating local variables
+        startDateChooser = new JDateChooser();
+        startDateChooser.setPreferredSize(new Dimension(130, 25));
+        startDateChooser.setDateFormatString("yyyy-MM-dd");
+
+        endDateChooser = new JDateChooser();
+        endDateChooser.setPreferredSize(new Dimension(130, 25));
+        endDateChooser.setDateFormatString("yyyy-MM-dd");
+
+        datePanel.add(startDateChooser);
         datePanel.add(new JLabel("to"));
-        endDateField = new JTextField(10);
-        endDateField.setToolTipText("YYYY-MM-DD");
-        datePanel.add(endDateField);
+        datePanel.add(endDateChooser);
         
         // Reason filter
         JPanel reasonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -121,8 +126,8 @@ public class InventoryAdjustmentView extends JPanel {
         searchButton.addActionListener(this::onSearchButtonClicked);
         clearButton.addActionListener(e -> {
             productComboBox.setSelectedIndex(0);
-            startDateField.setText("");
-            endDateField.setText("");
+            startDateChooser.setDate(null);
+            endDateChooser.setDate(null);
             reasonField.setText("");
             minQtyField.setText("");
             maxQtyField.setText("");
@@ -262,17 +267,13 @@ public class InventoryAdjustmentView extends JPanel {
             Product selectedProduct = (Product) productComboBox.getSelectedItem();
             Integer productId = selectedProduct.getId() > 0 ? selectedProduct.getId() : null;
             
-            // Parse date ranges
-            Date startDate = null;
-            if (!startDateField.getText().trim().isEmpty()) {
-                startDate = dateFormat.parse(startDateField.getText().trim());
-            }
-            
-            Date endDate = null;
-            if (!endDateField.getText().trim().isEmpty()) {
-                endDate = dateFormat.parse(endDateField.getText().trim());
-            }
-            
+            // Get dates from date choosers
+            Date startDate = startDateChooser.getDate();
+            Date endDate = endDateChooser.getDate();
+            // Add these debug prints
+            System.out.println("DEBUG - Search with dates: Start=" + 
+                (startDate != null ? dateFormat.format(startDate) : "null") + 
+                ", End=" + (endDate != null ? dateFormat.format(endDate) : "null"));
             // Get reason filter
             String reason = reasonField.getText().trim().isEmpty() ? null : reasonField.getText().trim();
             
@@ -292,11 +293,6 @@ public class InventoryAdjustmentView extends JPanel {
                 productId, startDate, endDate, reason, minQty, maxQty);
             refreshAdjustmentTable();
             
-        } catch (ParseException ex) {
-            JOptionPane.showMessageDialog(this,
-                "Invalid date format. Please use YYYY-MM-DD format.",
-                "Input Error",
-                JOptionPane.ERROR_MESSAGE);
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this,
                 "Invalid number format for quantity filters.",
@@ -365,7 +361,7 @@ public class InventoryAdjustmentView extends JPanel {
         // Form fields
         JTextField idField = new JTextField();
         JComboBox<Product> productField = new JComboBox<>();
-        JTextField dateField = new JTextField();
+        JDateChooser dateChooser = new JDateChooser(); // Replace JTextField with JDateChooser
         JSpinner quantityField = new JSpinner(new SpinnerNumberModel(0, -1000, 1000, 1));
         JTextArea reasonField = new JTextArea();
         
@@ -379,9 +375,10 @@ public class InventoryAdjustmentView extends JPanel {
         }
         
         // Set current date for new adjustments
+        // Set current date for new adjustments
         if (adjustment == null) {
             idField.setText("0");
-            dateField.setText(dateFormat.format(new Date()));
+            dateChooser.setDate(new Date());
         } else {
             // Populate fields for editing
             idField.setText(String.valueOf(adjustment.getId()));
@@ -395,21 +392,20 @@ public class InventoryAdjustmentView extends JPanel {
                 }
             }
             
-            dateField.setText(dateFormat.format(adjustment.getDate()));
+            dateChooser.setDate(adjustment.getDate());
             quantityField.setValue(adjustment.getChangeQty());
             reasonField.setText(adjustment.getReason());
             
             // Disable product change for existing adjustments
             productField.setEnabled(false);
         }
-        
         // Add fields to form
         formPanel.add(new JLabel("ID:"));
         formPanel.add(idField);
         formPanel.add(new JLabel("Product:"));
         formPanel.add(productField);
-        formPanel.add(new JLabel("Date (YYYY-MM-DD):"));
-        formPanel.add(dateField);
+        formPanel.add(new JLabel("Date:"));
+        formPanel.add(dateChooser);
         formPanel.add(new JLabel("Quantity Change:"));
         formPanel.add(quantityField);
         formPanel.add(new JLabel("Reason:"));
@@ -435,8 +431,14 @@ public class InventoryAdjustmentView extends JPanel {
                     return;
                 }
                 
-                // Parse date
-                Date date = dateFormat.parse(dateField.getText().trim());
+                // Get date from date chooser
+                Date date = dateChooser.getDate();
+                if (date == null) {
+                    JOptionPane.showMessageDialog(dialog, 
+                        "Please select a date.", 
+                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
                 
                 // Create or update adjustment
                 InventoryAdjustment adj = new InventoryAdjustment();
@@ -465,17 +467,12 @@ public class InventoryAdjustmentView extends JPanel {
                         "Error",
                         JOptionPane.ERROR_MESSAGE);
                 }
-            } catch (ParseException ex) {
-                JOptionPane.showMessageDialog(dialog, 
-                    "Invalid date format. Please use YYYY-MM-DD format.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
                     "Please enter valid numeric values.", 
                     "Input Error", JOptionPane.ERROR_MESSAGE);
             }
         });
-        
         cancelButton.addActionListener(e -> dialog.dispose());
         
         buttonPanel.add(saveButton);

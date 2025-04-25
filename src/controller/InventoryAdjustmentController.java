@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
@@ -77,14 +78,35 @@ public class InventoryAdjustmentController {
             params.add(productId);
         }
         
-        if (startDate != null) {
-            sql.append("AND a.date >= ? ");
-            params.add(startDate);
-        }
         
+        
+        if (startDate != null) {
+            // Convert to start of day for proper comparison
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(startDate);
+            cal.set(Calendar.HOUR_OF_DAY, 0);
+            cal.set(Calendar.MINUTE, 0);
+            cal.set(Calendar.SECOND, 0);
+            startDate = cal.getTime();
+            String startDateStr = dateFormat.format(startDate);
+            sql.append("AND date(a.date) >= date(?) ");
+            params.add(startDateStr);
+            System.out.println("DEBUG - Using start date string: " + startDateStr);
+        }
+
         if (endDate != null) {
-            sql.append("AND a.date <= ? ");
-            params.add(endDate);
+            // Convert to end of day for proper comparison
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(endDate);
+            cal.set(Calendar.HOUR_OF_DAY, 23);
+            cal.set(Calendar.MINUTE, 59);
+            cal.set(Calendar.SECOND, 59);
+            endDate = cal.getTime();
+            
+            String endDateStr = dateFormat.format(endDate);
+            sql.append("AND date(a.date) <= date(?) ");
+            params.add(endDateStr);
+            System.out.println("DEBUG - Using end date string: " + endDateStr);
         }
         
         if (reason != null && !reason.trim().isEmpty()) {
@@ -103,7 +125,9 @@ public class InventoryAdjustmentController {
         }
         
         sql.append("ORDER BY a.date DESC");
-        
+        // At the end of the searchAdjustments method, before the return statement
+        System.out.println("DEBUG - SQL Query: " + sql.toString());
+        System.out.println("DEBUG - SQL Params: " + params);
         return queryAdjustments(sql.toString(), params.toArray());
     }
     
@@ -236,6 +260,7 @@ public class InventoryAdjustmentController {
      * Helper method to query adjustments
      */
     private List<InventoryAdjustment> queryAdjustments(String sql, Object... params) {
+
         return DataUtil.query(sql, new ResultSetMapper<InventoryAdjustment>() {
             @Override
             public InventoryAdjustment map(ResultSet rs) throws SQLException {
@@ -245,7 +270,10 @@ public class InventoryAdjustmentController {
                 
                 // Fix for the timestamp parsing issue
                 try {
+                    // After getting the date string
                     String dateStr = rs.getString("date");
+                    System.out.println("DEBUG - Date from database: " + dateStr);
+
                     if (dateStr != null) {
                         try {
                             // Try parsing with dateTimeFormat first

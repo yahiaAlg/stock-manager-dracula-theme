@@ -4,6 +4,7 @@ import controller.OrderController;
 import controller.CustomerController;
 import model.Order;
 import model.Customer;
+import util.PDFGenerator;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -11,6 +12,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.text.SimpleDateFormat;
 import java.util.List;
+import java.io.File;
+import java.io.IOException;
 
 public class OrderView extends JPanel {
     
@@ -24,11 +27,12 @@ public class OrderView extends JPanel {
     private JButton viewButton;
     private JButton editButton;
     private JButton deleteButton;
+    private JButton generatePdfButton; // New button for PDF generation
     
     private OrderController orderController;
     private CustomerController customerController;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    
+        
     public OrderView(OrderController orderController, CustomerController customerController) {
         this.orderController = orderController;
         this.customerController = customerController;
@@ -99,12 +103,17 @@ public class OrderView extends JPanel {
         deleteButton.addActionListener(e -> deleteSelectedOrder());
         bottomPanel.add(deleteButton);
         
+        // Add new PDF generation button
+        generatePdfButton = new JButton("Generate PDF Ticket");
+        generatePdfButton.addActionListener(e -> generatePdfTicket());
+        bottomPanel.add(generatePdfButton);
+        
         add(bottomPanel, BorderLayout.SOUTH);
         
         // Load initial data
         loadOrders();
     }
-    
+
     private void loadCustomers() {
         List<Customer> customers = customerController.getAllCustomers();
         for (Customer customer : customers) {
@@ -240,15 +249,89 @@ public class OrderView extends JPanel {
         }
     }
     
+    private void generatePdfTicket() {
+        int selectedRow = orderTable.getSelectedRow();
+        if (selectedRow >= 0) {
+            int orderId = (int) tableModel.getValueAt(selectedRow, 0);
+            Order order = orderController.getOrderById(orderId);
+            
+            if (order != null) {
+                try {
+                    // Show a wait cursor
+                    setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                    
+                    // Generate the PDF
+                    File pdfFile = PDFGenerator.generateOrderTicket(order);
+                    
+                    // Restore the cursor
+                    setCursor(Cursor.getDefaultCursor());
+                    
+                    // Show success message with option to open the file
+                    int choice = JOptionPane.showConfirmDialog(
+                        this,
+                        "PDF ticket generated successfully:\n" + pdfFile.getAbsolutePath() + "\n\nWould you like to open it now?",
+                        "PDF Generated",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.INFORMATION_MESSAGE
+                    );
+                    
+                    // Open the file if requested
+                    if (choice == JOptionPane.YES_OPTION) {
+                        if (Desktop.isDesktopSupported()) {
+                            try {
+                                Desktop.getDesktop().open(pdfFile);
+                            } catch (IOException e) {
+                                JOptionPane.showMessageDialog(
+                                    this,
+                                    "Could not open the PDF file. It is located at:\n" + pdfFile.getAbsolutePath(),
+                                    "Cannot Open File",
+                                    JOptionPane.WARNING_MESSAGE
+                                );
+                            }
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                this,
+                                "Desktop not supported. The PDF file is located at:\n" + pdfFile.getAbsolutePath(),
+                                "Cannot Open File",
+                                JOptionPane.INFORMATION_MESSAGE
+                            );
+                        }
+                    }
+                } catch (Exception e) {
+                    // Restore the cursor
+                    setCursor(Cursor.getDefaultCursor());
+                    
+                    // Show error message
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Error generating PDF: " + e.getMessage(),
+                        "PDF Generation Error",
+                        JOptionPane.ERROR_MESSAGE
+                    );
+                    e.printStackTrace();
+                }
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Please select an order to generate a PDF ticket",
+                "No Selection",
+                JOptionPane.WARNING_MESSAGE
+            );
+        }
+    }
+
     // Custom renderer for the buttons column
     private class ButtonsRenderer extends JPanel implements javax.swing.table.TableCellRenderer {
         private JButton viewButton = new JButton("View");
         private JButton editButton = new JButton("Edit");
+        private JButton pdfButton = new JButton("PDF");
         
         public ButtonsRenderer() {
             setLayout(new FlowLayout(FlowLayout.CENTER, 2, 0));
             add(viewButton);
             add(editButton);
+            add(pdfButton);
         }
         
         @Override
@@ -261,11 +344,12 @@ public class OrderView extends JPanel {
             return this;
         }
     }
-    
+       
     // Custom editor for the buttons column
     private class ButtonsEditor extends DefaultCellEditor {
         private JButton viewButton = new JButton("View");
         private JButton editButton = new JButton("Edit");
+        private JButton pdfButton = new JButton("PDF");
         private JPanel panel;
         private int clickedRow;
         
@@ -284,8 +368,14 @@ public class OrderView extends JPanel {
                 editOrder(clickedRow);
             });
             
+            pdfButton.addActionListener(e -> {
+                fireEditingStopped();
+                generatePdf(clickedRow);
+            });
+            
             panel.add(viewButton);
             panel.add(editButton);
+            panel.add(pdfButton);
         }
         
         @Override
@@ -298,6 +388,68 @@ public class OrderView extends JPanel {
         @Override
         public Object getCellEditorValue() {
             return "Actions";
+        }
+        
+        private void generatePdf(int row) {
+            int orderId = (int) tableModel.getValueAt(row, 0);
+            Order order = orderController.getOrderById(orderId);
+            
+            if (order != null) {
+                try {
+                    // Show a wait cursor
+                    OrderView.this.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+                    
+                    // Generate the PDF
+                    File pdfFile = PDFGenerator.generateOrderTicket(order);
+                    
+                    // Restore the cursor
+                    OrderView.this.setCursor(Cursor.getDefaultCursor());
+                    
+                    // Show success message with option to open the file
+                    int choice = JOptionPane.showConfirmDialog(
+                        OrderView.this,
+                        "PDF ticket generated successfully:\n" + pdfFile.getAbsolutePath() + "\n\nWould you like to open it now?",
+                        "PDF Generated",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.INFORMATION_MESSAGE
+                    );
+                    
+                    // Open the file if requested
+                    if (choice == JOptionPane.YES_OPTION) {
+                        if (Desktop.isDesktopSupported()) {
+                            try {
+                                Desktop.getDesktop().open(pdfFile);
+                            } catch (IOException e) {
+                                JOptionPane.showMessageDialog(
+                                    OrderView.this,
+                                    "Could not open the PDF file. It is located at:\n" + pdfFile.getAbsolutePath(),
+                                    "Cannot Open File",
+                                    JOptionPane.WARNING_MESSAGE
+                                );
+                            }
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                OrderView.this,
+                                "Desktop not supported. The PDF file is located at:\n" + pdfFile.getAbsolutePath(),
+                                "Cannot Open File",
+                                JOptionPane.INFORMATION_MESSAGE
+                            );
+                        }
+                    }
+                } catch (Exception e) {
+                    // Restore the cursor
+                    OrderView.this.setCursor(Cursor.getDefaultCursor());
+                    
+                    // Show error message
+                    JOptionPane.showMessageDialog(
+                        OrderView.this,
+                        "Error generating PDF: " + e.getMessage(),
+                        "PDF Generation Error",
+                        JOptionPane.ERROR_MESSAGE
+                    );
+                    e.printStackTrace();
+                }
+            }
         }
         
         private void viewOrder(int row) {
