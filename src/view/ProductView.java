@@ -12,6 +12,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import util.ArabicFontHelper;
 
 public class ProductView extends JPanel {
     
@@ -33,9 +36,15 @@ public class ProductView extends JPanel {
     private JButton adjustStockButton;
     
     private List<Product> currentProducts;
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     public ProductView(ProductController controller) {
         this.controller = controller;
+        
+        // Load localization resources
+        loadLocalization();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
@@ -43,35 +52,61 @@ public class ProductView extends JPanel {
         loadAllProducts();
     }
     
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = util.LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this panel
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this panel if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
+    }
+    
     private void initComponents() {
         // Search panel (top)
         JPanel searchPanel = new JPanel(new BorderLayout(5, 0));
-        searchPanel.setBorder(BorderFactory.createTitledBorder("Search Products"));
+        searchPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("products.searchTitle")));
         
-        JPanel searchFieldPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel searchFieldPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
         
         searchField = new JTextField(20);
-        searchFieldPanel.add(new JLabel("Search:"));
+        if (isRightToLeft) {
+            searchField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        searchFieldPanel.add(new JLabel(messages.getString("common.search") + ":"));
         searchFieldPanel.add(searchField);
         
         categoryComboBox = new JComboBox<>();
         categoryComboBox.addItem(null); // Add empty selection
         loadCategories();
-        searchFieldPanel.add(new JLabel("Category:"));
+        searchFieldPanel.add(new JLabel(messages.getString("products.column.category") + ":"));
         searchFieldPanel.add(categoryComboBox);
         
         supplierComboBox = new JComboBox<>();
         supplierComboBox.addItem(null); // Add empty selection
         loadSuppliers();
-        searchFieldPanel.add(new JLabel("Supplier:"));
+        searchFieldPanel.add(new JLabel(messages.getString("products.column.supplier") + ":"));
         searchFieldPanel.add(supplierComboBox);
         
-        lowStockCheckBox = new JCheckBox("Low Stock Only");
+        lowStockCheckBox = new JCheckBox(messages.getString("products.filter.lowStock"));
         searchFieldPanel.add(lowStockCheckBox);
         
-        JPanel searchButtonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        searchButton = new JButton("Search");
-        clearButton = new JButton("Clear");
+        JPanel searchButtonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        searchButton = new JButton(messages.getString("button.search"));
+        clearButton = new JButton(messages.getString("button.clear"));
         
         searchButton.addActionListener(this::onSearchButtonClicked);
         clearButton.addActionListener(e -> {
@@ -90,9 +125,19 @@ public class ProductView extends JPanel {
         
         // Table panel (center)
         JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Products"));
+        tablePanel.setBorder(BorderFactory.createTitledBorder(messages.getString("products.title")));
         
-        String[] columnNames = {"ID", "SKU", "Name", "Category", "Supplier", "Unit Price", "Stock Qty", "Reorder Level"};
+        String[] columnNames = {
+            messages.getString("products.column.id"),
+            messages.getString("products.column.sku"),
+            messages.getString("products.column.name"),
+            messages.getString("products.column.category"),
+            messages.getString("products.column.supplier"),
+            messages.getString("products.column.price"),
+            messages.getString("products.column.stock"),
+            messages.getString("products.column.reorder")
+        };
+        
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -103,6 +148,12 @@ public class ProductView extends JPanel {
         productTable = new JTable(tableModel);
         productTable.setFillsViewportHeight(true);
         productTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            productTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            productTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Add double-click listener for editing
         productTable.addMouseListener(new MouseAdapter() {
@@ -118,12 +169,12 @@ public class ProductView extends JPanel {
         tablePanel.add(scrollPane, BorderLayout.CENTER);
         
         // Buttons panel (bottom)
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         
-        addButton = new JButton("Add Product");
-        editButton = new JButton("Edit");
-        deleteButton = new JButton("Delete");
-        adjustStockButton = new JButton("Adjust Stock");
+        addButton = new JButton(messages.getString("products.button.add"));
+        editButton = new JButton(messages.getString("button.edit"));
+        deleteButton = new JButton(messages.getString("button.delete"));
+        adjustStockButton = new JButton(messages.getString("products.button.adjustStock"));
         
         addButton.addActionListener(e -> showProductDialog(null));
         editButton.addActionListener(this::onEditButtonClicked);
@@ -158,7 +209,7 @@ public class ProductView extends JPanel {
                 product.getName(),
                 product.getCategoryName(),
                 product.getSupplierName(),
-                String.format("$%.2f", product.getUnitPrice()),
+                String.format("DZD %.2f", product.getUnitPrice()),
                 product.getStockQty(),
                 product.getReorderLevel()
             };
@@ -174,17 +225,16 @@ public class ProductView extends JPanel {
     }
     
     private void loadSuppliers() {
-        // We assume there's a method to get all suppliers
-        // This would typically come from a SupplierController
         List<Supplier> suppliers = controller.getAllSuppliers();
         for (Supplier supplier : suppliers) {
             supplierComboBox.addItem(supplier);
         }
     }
-
+    
     public void refreshData() {
         loadAllProducts();
     }
+    
     private void onSearchButtonClicked(ActionEvent e) {
         String searchTerm = searchField.getText().trim();
         Category selectedCategory = (Category) categoryComboBox.getSelectedItem();
@@ -214,8 +264,9 @@ public class ProductView extends JPanel {
             showProductDialog(selectedProduct);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a product to edit.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("products.error.selectToEdit"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -225,29 +276,30 @@ public class ProductView extends JPanel {
             Product selectedProduct = currentProducts.get(selectedRow);
             
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete the product: " + selectedProduct.getName() + "?",
-                "Confirm Deletion",
+                messages.getString("products.confirm.delete").replace("{0}", selectedProduct.getName()),
+                messages.getString("dialog.confirmDeletion"),
                 JOptionPane.YES_NO_OPTION);
                 
             if (confirm == JOptionPane.YES_OPTION) {
                 boolean success = controller.deleteProduct(selectedProduct.getId());
                 if (success) {
                     JOptionPane.showMessageDialog(this,
-                        "Product deleted successfully.",
-                        "Success",
+                        messages.getString("products.success.deleted"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     loadAllProducts();
                 } else {
                     JOptionPane.showMessageDialog(this,
-                        "Error deleting product. It may be used in orders or inventory adjustments.",
-                        "Error",
+                        messages.getString("products.error.delete"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             }
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a product to delete.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("products.error.selectToDelete"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -258,17 +310,25 @@ public class ProductView extends JPanel {
             showStockAdjustmentDialog(selectedProduct);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a product to adjust stock.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("products.error.selectToAdjust"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
     private void showProductDialog(Product product) {
         // Create a dialog for adding/editing products
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Product Details");
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
+            messages.getString("products.dialog.details"));
         dialog.setLayout(new BorderLayout());
         dialog.setSize(450, 450);
         dialog.setLocationRelativeTo(this);
+        
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
         
         JPanel formPanel = new JPanel(new GridLayout(8, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -281,6 +341,16 @@ public class ProductView extends JPanel {
         JTextField priceField = new JTextField();
         JTextField stockField = new JTextField();
         JTextField reorderField = new JTextField();
+        
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            idField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            skuField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            nameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            priceField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            stockField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            reorderField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Load categories and suppliers
         categoryField.addItem(null);
@@ -331,34 +401,35 @@ public class ProductView extends JPanel {
         // ID is not editable
         idField.setEditable(false);
         
-        formPanel.add(new JLabel("ID:"));
+        formPanel.add(new JLabel(messages.getString("products.column.id") + ":"));
         formPanel.add(idField);
-        formPanel.add(new JLabel("SKU:"));
+        formPanel.add(new JLabel(messages.getString("products.column.sku") + ":"));
         formPanel.add(skuField);
-        formPanel.add(new JLabel("Name:"));
+        formPanel.add(new JLabel(messages.getString("products.column.name") + ":"));
         formPanel.add(nameField);
-        formPanel.add(new JLabel("Category:"));
+        formPanel.add(new JLabel(messages.getString("products.column.category") + ":"));
         formPanel.add(categoryField);
-        formPanel.add(new JLabel("Supplier:"));
+        formPanel.add(new JLabel(messages.getString("products.column.supplier") + ":"));
         formPanel.add(supplierField);
-        formPanel.add(new JLabel("Unit Price:"));
+        formPanel.add(new JLabel(messages.getString("products.column.price") + ":"));
         formPanel.add(priceField);
-        formPanel.add(new JLabel("Stock Quantity:"));
+        formPanel.add(new JLabel(messages.getString("products.column.stock") + ":"));
         formPanel.add(stockField);
-        formPanel.add(new JLabel("Reorder Level:"));
+        formPanel.add(new JLabel(messages.getString("products.column.reorder") + ":"));
         formPanel.add(reorderField);
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton saveButton = new JButton("Save");
-        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton saveButton = new JButton(messages.getString("button.save"));
+        JButton cancelButton = new JButton(messages.getString("button.cancel"));
         
         saveButton.addActionListener(e -> {
             try {
                 // Validate input
                 if (skuField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "SKU and Name are required fields.", 
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("products.error.requiredFields"), 
+                        messages.getString("dialog.validationError"), 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -381,21 +452,22 @@ public class ProductView extends JPanel {
                 
                 if (success) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Product saved successfully.",
-                        "Success",
+                        messages.getString("products.success.saved"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadAllProducts();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Error saving product. Please check your inputs.",
-                        "Error",
+                        messages.getString("products.error.save"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please enter valid numeric values for price, stock quantity, and reorder level.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("products.error.numericValues"), 
+                    messages.getString("dialog.inputError"), 
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         
@@ -411,10 +483,17 @@ public class ProductView extends JPanel {
     }
     
     private void showStockAdjustmentDialog(Product product) {
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Adjust Stock");
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
+            messages.getString("products.dialog.adjustStock"));
         dialog.setLayout(new BorderLayout());
         dialog.setSize(550, 250);
         dialog.setLocationRelativeTo(this);
+        
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
         
         JPanel formPanel = new JPanel(new GridLayout(5, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -427,41 +506,52 @@ public class ProductView extends JPanel {
         
         JTextField adjustmentField = new JTextField("0");
         
-        JRadioButton addRadio = new JRadioButton("Add to Stock");
-        JRadioButton removeRadio = new JRadioButton("Remove from Stock");
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            productField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            currentStockField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            adjustmentField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        JRadioButton addRadio = new JRadioButton(messages.getString("products.radio.add"));
+        JRadioButton removeRadio = new JRadioButton(messages.getString("products.radio.remove"));
         ButtonGroup group = new ButtonGroup();
         group.add(addRadio);
         group.add(removeRadio);
         addRadio.setSelected(true);
         
-        JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel radioPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
         radioPanel.add(addRadio);
         radioPanel.add(removeRadio);
         
         JTextField reasonField = new JTextField();
+        if (isRightToLeft) {
+            reasonField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
-        formPanel.add(new JLabel("Product:"));
+        formPanel.add(new JLabel(messages.getString("products.label.product") + ":"));
         formPanel.add(productField);
-        formPanel.add(new JLabel("Current Stock:"));
+        formPanel.add(new JLabel(messages.getString("products.label.currentStock") + ":"));
         formPanel.add(currentStockField);
-        formPanel.add(new JLabel("Adjustment Type:"));
+        formPanel.add(new JLabel(messages.getString("products.label.adjustmentType") + ":"));
         formPanel.add(radioPanel);
-        formPanel.add(new JLabel("Quantity:"));
+        formPanel.add(new JLabel(messages.getString("products.label.quantity") + ":"));
         formPanel.add(adjustmentField);
-        formPanel.add(new JLabel("Reason:"));
+        formPanel.add(new JLabel(messages.getString("products.label.reason") + ":"));
         formPanel.add(reasonField);
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton saveButton = new JButton("Save");
-        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton saveButton = new JButton(messages.getString("button.save"));
+        JButton cancelButton = new JButton(messages.getString("button.cancel"));
         
         saveButton.addActionListener(e -> {
             try {
                 int quantity = Integer.parseInt(adjustmentField.getText());
                 if (quantity <= 0) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Please enter a positive quantity.", 
-                        "Input Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("products.error.positiveQuantity"), 
+                        messages.getString("dialog.inputError"), 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -471,8 +561,9 @@ public class ProductView extends JPanel {
                 
                 if (reason.isEmpty()) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Please enter a reason for the adjustment.", 
-                        "Input Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("products.error.reasonRequired"), 
+                        messages.getString("dialog.inputError"), 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -480,21 +571,22 @@ public class ProductView extends JPanel {
                 
                 if (success) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Stock adjusted successfully.",
-                        "Success",
+                        messages.getString("products.success.adjusted"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadAllProducts();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Error adjusting stock. Please try again.",
-                        "Error",
+                        messages.getString("products.error.adjust"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please enter a valid number for quantity.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("products.error.numericValues"), 
+                    messages.getString("dialog.inputError"), 
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         

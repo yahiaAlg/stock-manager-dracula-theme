@@ -7,8 +7,12 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 import org.jfree.chart.ChartPanel;
+import util.ArabicFontHelper;
+import util.LocaleManager;
 
 public class DashboardView extends JPanel {
     
@@ -30,8 +34,15 @@ public class DashboardView extends JPanel {
     private JTable lowStockTable;
     private DefaultTableModel lowStockTableModel;
     
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
+    
     public DashboardView(DashboardController controller) {
         this.controller = controller;
+        
+        // Load localization resources
+        loadLocalization();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
@@ -39,19 +50,41 @@ public class DashboardView extends JPanel {
         refreshData();
     }
     
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this panel
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this panel if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
+    }
+    
     private void initComponents() {
         // Metrics panel
         metricsPanel = new JPanel(new GridLayout(2, 4, 10, 10));
-        metricsPanel.setBorder(BorderFactory.createTitledBorder("Key Metrics"));
+        metricsPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.keyMetrics")));
         
-        totalProductsLabel = createMetricLabel("Total Products", "0");
-        lowStockCountLabel = createMetricLabel("Low Stock Items", "0");
-        inventoryValueLabel = createMetricLabel("Inventory Value", "$0.00");
-        totalOrdersLabel = createMetricLabel("Total Orders", "0");
-        pendingOrdersLabel = createMetricLabel("Pending Orders", "0");
-        todayOrdersLabel = createMetricLabel("Today's Orders", "0");
-        todaySalesLabel = createMetricLabel("Today's Sales", "$0.00");
-        recentSalesLabel = createMetricLabel("30-Day Sales", "$0.00");
+        totalProductsLabel = createMetricLabel(messages.getString("dashboard.totalProducts"), "0");
+        lowStockCountLabel = createMetricLabel(messages.getString("dashboard.lowStockItems"), "0");
+        inventoryValueLabel = createMetricLabel(messages.getString("dashboard.inventoryValue"), "DZD0.00");
+        totalOrdersLabel = createMetricLabel(messages.getString("dashboard.totalOrders"), "0");
+        pendingOrdersLabel = createMetricLabel(messages.getString("dashboard.pendingOrders"), "0");
+        todayOrdersLabel = createMetricLabel(messages.getString("dashboard.todayOrders"), "0");
+        todaySalesLabel = createMetricLabel(messages.getString("dashboard.todaySales"), "DZD0.00");
+        recentSalesLabel = createMetricLabel(messages.getString("dashboard.recentSales"), "DZD0.00");
         
         metricsPanel.add(totalProductsLabel);
         metricsPanel.add(lowStockCountLabel);
@@ -64,13 +97,22 @@ public class DashboardView extends JPanel {
         
         // Charts panel - changed to 2x2 grid for four charts
         chartsPanel = new JPanel(new GridLayout(2, 2, 10, 10));
-        chartsPanel.setBorder(BorderFactory.createTitledBorder("Analytics"));
+        chartsPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.analytics")));
         
         // Low stock panel
         lowStockPanel = new JPanel(new BorderLayout(5, 5));
-        lowStockPanel.setBorder(BorderFactory.createTitledBorder("Low Stock Items"));
+        lowStockPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.lowStockItems")));
         
-        String[] columnNames = {"ID", "SKU", "Name", "Category", "Supplier", "Stock Qty", "Reorder Level"};
+        String[] columnNames = {
+            messages.getString("column.id"), 
+            messages.getString("products.column.sku"), 
+            messages.getString("products.column.name"), 
+            messages.getString("products.column.category"), 
+            messages.getString("products.column.supplier"), 
+            messages.getString("products.column.stockQty"), 
+            messages.getString("products.column.reorderLevel")
+        };
+        
         lowStockTableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -81,6 +123,12 @@ public class DashboardView extends JPanel {
         lowStockTable = new JTable(lowStockTableModel);
         lowStockTable.setFillsViewportHeight(true);
         lowStockTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            lowStockTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            lowStockTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         JScrollPane scrollPane = new JScrollPane(lowStockTable);
         lowStockPanel.add(scrollPane, BorderLayout.CENTER);
@@ -99,14 +147,16 @@ public class DashboardView extends JPanel {
         splitPane.setDividerLocation(700); // Initial divider location - increased for more chart space
         splitPane.setOneTouchExpandable(true);
         
-        // Add to the main view
-        add(splitPane, BorderLayout.CENTER);
-        
         // Add tab panel for additional analysis views
         JTabbedPane tabbedAnalytics = new JTabbedPane();
-        tabbedAnalytics.addTab("Main Dashboard", splitPane);
-        tabbedAnalytics.addTab("Product Analysis", createProductAnalysisPanel());
-        tabbedAnalytics.addTab("Order Analysis", createOrderAnalysisPanel());
+        tabbedAnalytics.addTab(messages.getString("dashboard.mainDashboard"), splitPane);
+        tabbedAnalytics.addTab(messages.getString("dashboard.productAnalysis"), createProductAnalysisPanel());
+        tabbedAnalytics.addTab(messages.getString("dashboard.orderAnalysis"), createOrderAnalysisPanel());
+        
+        // Apply RTL to tabbed pane if needed
+        if (isRightToLeft) {
+            tabbedAnalytics.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         add(tabbedAnalytics, BorderLayout.CENTER);
     }
@@ -115,44 +165,49 @@ public class DashboardView extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
+        // Apply RTL if needed
+        if (isRightToLeft) {
+            panel.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         // Create metrics panel for product statistics
         JPanel metricsPanel = new JPanel(new GridLayout(2, 4, 10, 10));
-        metricsPanel.setBorder(BorderFactory.createTitledBorder("Product Metrics"));
+        metricsPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.productMetrics")));
         
         Map<String, Object> priceStats = controller.getProductPriceStats();
         Map<String, Object> stockStats = controller.getProductStockStats();
         
-        JLabel minPriceLabel = createMetricLabel("Min Price", 
-            String.format("$%.2f", priceStats.get("minPrice") != null ? 
+        JLabel minPriceLabel = createMetricLabel(messages.getString("dashboard.minPrice"), 
+            String.format("%.2f", priceStats.get("minPrice") != null ? 
                 ((Number)priceStats.get("minPrice")).doubleValue() : 0.0));
                 
-        JLabel maxPriceLabel = createMetricLabel("Max Price", 
-            String.format("$%.2f", priceStats.get("maxPrice") != null ? 
+        JLabel maxPriceLabel = createMetricLabel(messages.getString("dashboard.maxPrice"), 
+            String.format("%.2f", priceStats.get("maxPrice") != null ? 
                 ((Number)priceStats.get("maxPrice")).doubleValue() : 0.0));
                 
-        JLabel avgPriceLabel = createMetricLabel("Avg Price", 
-            String.format("$%.2f", priceStats.get("avgPrice") != null ? 
+        JLabel avgPriceLabel = createMetricLabel(messages.getString("dashboard.avgPrice"), 
+            String.format("%.2f", priceStats.get("avgPrice") != null ? 
                 ((Number)priceStats.get("avgPrice")).doubleValue() : 0.0));
                 
-        JLabel medianPriceLabel = createMetricLabel("Median Price", 
-            String.format("$%.2f", priceStats.get("medianPrice") != null ? 
+        JLabel medianPriceLabel = createMetricLabel(messages.getString("dashboard.medianPrice"), 
+            String.format("%.2f", priceStats.get("medianPrice") != null ? 
                 ((Number)priceStats.get("medianPrice")).doubleValue() : 0.0));
         
-        JLabel minStockLabel = createMetricLabel("Min Stock", 
+        JLabel minStockLabel = createMetricLabel(messages.getString("dashboard.minStock"), 
             String.valueOf(stockStats.get("minStock") != null ? 
                 ((Number)stockStats.get("minStock")).intValue() : 0));
                 
-        JLabel maxStockLabel = createMetricLabel("Max Stock", 
+        JLabel maxStockLabel = createMetricLabel(messages.getString("dashboard.maxStock"), 
             String.valueOf(stockStats.get("maxStock") != null ? 
                 ((Number)stockStats.get("maxStock")).intValue() : 0));
                 
-        JLabel avgStockLabel = createMetricLabel("Avg Stock", 
+        JLabel avgStockLabel = createMetricLabel(messages.getString("dashboard.avgStock"), 
             String.format("%.1f", stockStats.get("avgStock") != null ? 
                 ((Number)stockStats.get("avgStock")).doubleValue() : 0.0));
                 
-        JLabel zeroStockLabel = createMetricLabel("Out of Stock", 
+        JLabel zeroStockLabel = createMetricLabel(messages.getString("dashboard.outOfStock"), 
             String.valueOf(stockStats.get("zeroStock") != null ? 
-                ((Number)stockStats.get("zeroStock")).intValue() : 0) + " products");
+                ((Number)stockStats.get("zeroStock")).intValue() : 0) + " " + messages.getString("dashboard.products"));
         
         metricsPanel.add(minPriceLabel);
         metricsPanel.add(maxPriceLabel);
@@ -165,7 +220,7 @@ public class DashboardView extends JPanel {
         
         // Create charts panel for product analysis
         JPanel chartsPanel = new JPanel(new GridLayout(2, 2, 10, 10));
-        chartsPanel.setBorder(BorderFactory.createTitledBorder("Product Analysis"));
+        chartsPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.productAnalysis")));
         
         // Create and add price histogram chart
         ChartPanel priceHistogramPanel = new ChartPanel(controller.createProductPriceHistogram());
@@ -199,48 +254,53 @@ public class DashboardView extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
+        // Apply RTL if needed
+        if (isRightToLeft) {
+            panel.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         // Create metrics panel for order statistics
         JPanel metricsPanel = new JPanel(new GridLayout(2, 4, 10, 10));
-        metricsPanel.setBorder(BorderFactory.createTitledBorder("Order Metrics"));
+        metricsPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.orderMetrics")));
         
         Map<String, Object> orderStats = controller.getOrderStats();
         Map<String, Object> dateRangeStats = controller.getOrdersByDateRange();
         
-        JLabel totalOrdersLabel = createMetricLabel("Total Orders", 
+        JLabel totalOrdersLabel = createMetricLabel(messages.getString("dashboard.totalOrders"), 
             String.valueOf(orderStats.get("totalOrders") != null ? 
                 ((Number)orderStats.get("totalOrders")).intValue() : 0));
                 
-        JLabel avgOrderValueLabel = createMetricLabel("Avg Order Value", 
-            String.format("$%.2f", orderStats.get("avgOrderValue") != null ? 
+        JLabel avgOrderValueLabel = createMetricLabel(messages.getString("dashboard.avgOrderValue"), 
+            String.format("DZD %.2f", orderStats.get("avgOrderValue") != null ? 
                 ((Number)orderStats.get("avgOrderValue")).doubleValue() : 0.0));
                 
-        JLabel maxOrderValueLabel = createMetricLabel("Max Order Value", 
-            String.format("$%.2f", orderStats.get("maxOrderValue") != null ? 
+        JLabel maxOrderValueLabel = createMetricLabel(messages.getString("dashboard.maxOrderValue"), 
+            String.format("DZD %.2f", orderStats.get("maxOrderValue") != null ? 
                 ((Number)orderStats.get("maxOrderValue")).doubleValue() : 0.0));
                 
-        JLabel totalRevenueLabel = createMetricLabel("Total Revenue", 
-            String.format("$%.2f", orderStats.get("totalRevenue") != null ? 
+        JLabel totalRevenueLabel = createMetricLabel(messages.getString("dashboard.totalRevenue"), 
+            String.format("DZD %.2f", orderStats.get("totalRevenue") != null ? 
                 ((Number)orderStats.get("totalRevenue")).doubleValue() : 0.0));
         
-        JLabel todayOrdersLabel = createMetricLabel("Today's Orders", 
+        JLabel todayOrdersLabel = createMetricLabel(messages.getString("dashboard.todayOrders"), 
             String.valueOf(dateRangeStats.get("todayCount") != null ? 
                 ((Number)dateRangeStats.get("todayCount")).intValue() : 0) + 
-            " ($" + String.format("%.2f", dateRangeStats.get("todayTotal") != null ? 
+            " (DZD" + String.format("%.2f", dateRangeStats.get("todayTotal") != null ? 
                 ((Number)dateRangeStats.get("todayTotal")).doubleValue() : 0.0) + ")");
                 
-        JLabel weekOrdersLabel = createMetricLabel("7-Day Orders", 
+        JLabel weekOrdersLabel = createMetricLabel(messages.getString("dashboard.weekOrders"), 
             String.valueOf(dateRangeStats.get("weekCount") != null ? 
                 ((Number)dateRangeStats.get("weekCount")).intValue() : 0) + 
-            " ($" + String.format("%.2f", dateRangeStats.get("weekTotal") != null ? 
+            " (DZD" + String.format("%.2f", dateRangeStats.get("weekTotal") != null ? 
                 ((Number)dateRangeStats.get("weekTotal")).doubleValue() : 0.0) + ")");
                 
-        JLabel monthOrdersLabel = createMetricLabel("30-Day Orders", 
+        JLabel monthOrdersLabel = createMetricLabel(messages.getString("dashboard.monthOrders"), 
             String.valueOf(dateRangeStats.get("monthCount") != null ? 
                 ((Number)dateRangeStats.get("monthCount")).intValue() : 0) + 
-            " ($" + String.format("%.2f", dateRangeStats.get("monthTotal") != null ? 
+            " (DZD" + String.format("%.2f", dateRangeStats.get("monthTotal") != null ? 
                 ((Number)dateRangeStats.get("monthTotal")).doubleValue() : 0.0) + ")");
                 
-        JLabel avgItemsLabel = createMetricLabel("Avg Items/Order", 
+        JLabel avgItemsLabel = createMetricLabel(messages.getString("dashboard.avgItemsPerOrder"), 
             String.format("%.1f", orderStats.get("avgItemsPerOrder") != null ? 
                 ((Number)orderStats.get("avgItemsPerOrder")).doubleValue() : 0.0));
         
@@ -255,7 +315,7 @@ public class DashboardView extends JPanel {
         
         // Create charts panel for order analysis
         JPanel chartsPanel = new JPanel(new GridLayout(2, 2, 10, 10));
-        chartsPanel.setBorder(BorderFactory.createTitledBorder("Order Analysis"));
+        chartsPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("dashboard.orderAnalysis")));
         
         // Create and add order status chart
         ChartPanel orderStatusPanel = new ChartPanel(controller.createOrdersByStatusChart());
@@ -289,24 +349,24 @@ public class DashboardView extends JPanel {
         // Update metrics
         Map<String, Object> metrics = controller.getStockMetrics();
         
-        totalProductsLabel.setText(formatMetric("Total Products", metrics.get("totalProducts")));
-        lowStockCountLabel.setText(formatMetric("Low Stock Items", metrics.get("lowStockCount")));
+        totalProductsLabel.setText(formatMetric(messages.getString("dashboard.totalProducts"), metrics.get("totalProducts")));
+        lowStockCountLabel.setText(formatMetric(messages.getString("dashboard.lowStockItems"), metrics.get("lowStockCount")));
         
         Double invValue = metrics.get("inventoryValue") != null ? 
                          ((Number)metrics.get("inventoryValue")).doubleValue() : 0.0;
-        inventoryValueLabel.setText(formatMetric("Inventory Value", String.format("$%.2f", invValue)));
+        inventoryValueLabel.setText(formatMetric(messages.getString("dashboard.inventoryValue"), String.format("DZD %.2f", invValue)));
         
-        totalOrdersLabel.setText(formatMetric("Total Orders", metrics.get("totalOrders")));
-        pendingOrdersLabel.setText(formatMetric("Pending Orders", metrics.get("pendingOrders")));
-        todayOrdersLabel.setText(formatMetric("Today's Orders", metrics.get("todayOrders")));
+        totalOrdersLabel.setText(formatMetric(messages.getString("dashboard.totalOrders"), metrics.get("totalOrders")));
+        pendingOrdersLabel.setText(formatMetric(messages.getString("dashboard.pendingOrders"), metrics.get("pendingOrders")));
+        todayOrdersLabel.setText(formatMetric(messages.getString("dashboard.todayOrders"), metrics.get("todayOrders")));
         
         Double todaySales = metrics.get("todaySales") != null ? 
                            ((Number)metrics.get("todaySales")).doubleValue() : 0.0;
-        todaySalesLabel.setText(formatMetric("Today's Sales", String.format("$%.2f", todaySales)));
+        todaySalesLabel.setText(formatMetric(messages.getString("dashboard.todaySales"), String.format("DZD %.2f", todaySales)));
         
         Double recentSales = metrics.get("recentSales") != null ? 
                             ((Number)metrics.get("recentSales")).doubleValue() : 0.0;
-        recentSalesLabel.setText(formatMetric("30-Day Sales", String.format("$%.2f", recentSales)));
+        recentSalesLabel.setText(formatMetric(messages.getString("dashboard.recentSales"), String.format("DZD %.2f", recentSales)));
         
         // Update low stock table
         refreshLowStockTable();
@@ -319,8 +379,8 @@ public class DashboardView extends JPanel {
         tabbedAnalytics.removeTabAt(2); // Order Analysis tab
         tabbedAnalytics.removeTabAt(1); // Product Analysis tab
         
-        tabbedAnalytics.addTab("Product Analysis", createProductAnalysisPanel());
-        tabbedAnalytics.addTab("Order Analysis", createOrderAnalysisPanel());        
+        tabbedAnalytics.addTab(messages.getString("dashboard.productAnalysis"), createProductAnalysisPanel());
+        tabbedAnalytics.addTab(messages.getString("dashboard.orderAnalysis"), createOrderAnalysisPanel());        
     }
     
     private void refreshLowStockTable() {
@@ -380,19 +440,32 @@ public class DashboardView extends JPanel {
     }
     
     private JLabel createMetricLabel(String title, String value) {
-        JLabel label = new JLabel("<html><div style='text-align: center;'>" +
+        // Direct HTML text alignment for RTL support
+        String textAlign = isRightToLeft ? "right" : "center";
+        
+        JLabel label = new JLabel("<html><div style='text-align: " + textAlign + ";'>" +
                                   "<b>" + title + "</b><br>" +
                                   "<font size='+1'>" + value + "</font></div></html>", 
                                   JLabel.CENTER);
+        
+        // Apply RTL if needed
+        if (isRightToLeft) {
+            label.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         label.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Color.LIGHT_GRAY),
             BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
+        
         return label;
     }
     
     private String formatMetric(String title, Object value) {
-        return "<html><div style='text-align: center;'>" +
+        // Direct HTML text alignment for RTL support
+        String textAlign = isRightToLeft ? "right" : "center";
+        
+        return "<html><div style='text-align: " + textAlign + ";'>" +
                "<b>" + title + "</b><br>" +
                "<font size='+1'>" + (value != null ? value.toString() : "0") + "</font></div></html>";
     }

@@ -4,6 +4,7 @@ import controller.CustomerController;
 import controller.OrderController;
 import model.Customer;
 import model.Order;
+import util.ArabicFontHelper;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -13,6 +14,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 public class CustomerView extends JPanel {
     
@@ -30,9 +33,15 @@ public class CustomerView extends JPanel {
     private JButton viewOrdersButton;
     
     private List<Customer> currentCustomers;
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     public CustomerView(CustomerController controller) {
         this.controller = controller;
+        
+        // Load localization resources
+        loadLocalization();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
@@ -40,20 +49,46 @@ public class CustomerView extends JPanel {
         loadAllCustomers();
     }
     
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = util.LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this panel
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this panel if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
+    }
+    
     private void initComponents() {
         // Search panel (top)
         JPanel searchPanel = new JPanel(new BorderLayout(5, 0));
-        searchPanel.setBorder(BorderFactory.createTitledBorder("Search Customers"));
+        searchPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("customers.searchTitle")));
         
-        JPanel searchFieldPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel searchFieldPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
         
         searchField = new JTextField(30);
-        searchFieldPanel.add(new JLabel("Search:"));
+        if (isRightToLeft) {
+            searchField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        searchFieldPanel.add(new JLabel(messages.getString("common.search") + ":"));
         searchFieldPanel.add(searchField);
         
-        JPanel searchButtonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        searchButton = new JButton("Search");
-        clearButton = new JButton("Clear");
+        JPanel searchButtonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        searchButton = new JButton(messages.getString("button.search"));
+        clearButton = new JButton(messages.getString("button.clear"));
         
         searchButton.addActionListener(this::onSearchButtonClicked);
         clearButton.addActionListener(e -> {
@@ -69,9 +104,16 @@ public class CustomerView extends JPanel {
         
         // Table panel (center)
         JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Customers"));
+        tablePanel.setBorder(BorderFactory.createTitledBorder(messages.getString("customers.title")));
         
-        String[] columnNames = {"ID", "Name", "Contact", "Email", "Address"};
+        String[] columnNames = {
+            messages.getString("column.id"),
+            messages.getString("customers.column.name"),
+            messages.getString("customers.column.contact"),
+            messages.getString("customers.column.email"),
+            messages.getString("customers.column.address")
+        };
+        
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -82,6 +124,12 @@ public class CustomerView extends JPanel {
         customerTable = new JTable(tableModel);
         customerTable.setFillsViewportHeight(true);
         customerTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            customerTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            customerTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Add double-click listener for editing
         customerTable.addMouseListener(new MouseAdapter() {
@@ -97,12 +145,12 @@ public class CustomerView extends JPanel {
         tablePanel.add(scrollPane, BorderLayout.CENTER);
         
         // Buttons panel (bottom)
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         
-        addButton = new JButton("Add Customer");
-        editButton = new JButton("Edit");
-        deleteButton = new JButton("Delete");
-        viewOrdersButton = new JButton("View Orders");
+        addButton = new JButton(messages.getString("customers.button.add"));
+        editButton = new JButton(messages.getString("button.edit"));
+        deleteButton = new JButton(messages.getString("button.delete"));
+        viewOrdersButton = new JButton(messages.getString("customers.button.viewOrders"));
         
         addButton.addActionListener(e -> showCustomerDialog(null));
         editButton.addActionListener(this::onEditButtonClicked);
@@ -160,8 +208,9 @@ public class CustomerView extends JPanel {
             showCustomerDialog(selectedCustomer);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a customer to edit.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("error.noSelection"),
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -171,29 +220,30 @@ public class CustomerView extends JPanel {
             Customer selectedCustomer = currentCustomers.get(selectedRow);
             
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete the customer: " + selectedCustomer.getName() + "?",
-                "Confirm Deletion",
+                messages.getString("customers.confirm.delete").replace("{0}", selectedCustomer.getName()),
+                messages.getString("dialog.confirmDeletion"),
                 JOptionPane.YES_NO_OPTION);
                 
             if (confirm == JOptionPane.YES_OPTION) {
                 boolean success = controller.deleteCustomer(selectedCustomer.getId());
                 if (success) {
                     JOptionPane.showMessageDialog(this,
-                        "Customer deleted successfully.",
-                        "Success",
+                        messages.getString("customers.success.deleted"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     loadAllCustomers();
                 } else {
                     JOptionPane.showMessageDialog(this,
-                        "Error deleting customer. They may have associated orders.",
-                        "Error",
+                        messages.getString("customers.error.delete"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             }
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a customer to delete.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("customers.error.selectToDelete"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -204,17 +254,25 @@ public class CustomerView extends JPanel {
             showOrdersDialog(selectedCustomer);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a customer to view orders.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("customers.error.selectToViewOrders"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
     private void showCustomerDialog(Customer customer) {
         // Create a dialog for adding/editing customers
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Customer Details");
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
+            messages.getString("dialog.customerDetails"));
         dialog.setLayout(new BorderLayout());
         dialog.setSize(400, 350);
         dialog.setLocationRelativeTo(this);
+        
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
         
         JPanel formPanel = new JPanel(new GridLayout(5, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -226,6 +284,15 @@ public class CustomerView extends JPanel {
         JTextArea addressField = new JTextArea();
         addressField.setLineWrap(true);
         addressField.setWrapStyleWord(true);
+        
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            idField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            nameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            contactField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            emailField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            addressField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Populate fields if editing
         if (customer != null) {
@@ -242,28 +309,29 @@ public class CustomerView extends JPanel {
         // ID is not editable
         idField.setEditable(false);
         
-        formPanel.add(new JLabel("ID:"));
+        formPanel.add(new JLabel(messages.getString("column.id") + ":"));
         formPanel.add(idField);
-        formPanel.add(new JLabel("Name:"));
+        formPanel.add(new JLabel(messages.getString("customers.column.name") + ":"));
         formPanel.add(nameField);
-        formPanel.add(new JLabel("Contact:"));
+        formPanel.add(new JLabel(messages.getString("customers.column.contact") + ":"));
         formPanel.add(contactField);
-        formPanel.add(new JLabel("Email:"));
+        formPanel.add(new JLabel(messages.getString("customers.column.email") + ":"));
         formPanel.add(emailField);
-        formPanel.add(new JLabel("Address:"));
+        formPanel.add(new JLabel(messages.getString("customers.column.address") + ":"));
         formPanel.add(new JScrollPane(addressField)); // Use scroll pane for text area
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton saveButton = new JButton("Save");
-        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton saveButton = new JButton(messages.getString("button.save"));
+        JButton cancelButton = new JButton(messages.getString("button.cancel"));
         
         saveButton.addActionListener(e -> {
             try {
                 // Validate input
                 if (nameField.getText().trim().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Name is a required field.", 
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("customers.error.nameRequired"), 
+                        messages.getString("dialog.validationError"), 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -278,21 +346,22 @@ public class CustomerView extends JPanel {
                 
                 if (success) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Customer saved successfully.",
-                        "Success",
+                        messages.getString("customers.success.saved"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadAllCustomers();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Error saving customer. Please check your inputs.",
-                        "Error",
+                        messages.getString("customers.error.save"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please enter valid values.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("error.invalidNumber"), 
+                    messages.getString("dialog.inputError"), 
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         
@@ -309,26 +378,38 @@ public class CustomerView extends JPanel {
     
     private void showOrdersDialog(Customer customer) {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
-            "Orders for " + customer.getName());
+            messages.getString("customers.ordersFor") + " " + customer.getName());
         dialog.setLayout(new BorderLayout());
         dialog.setSize(800, 500);
         dialog.setLocationRelativeTo(this);
         
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
+        
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JLabel titleLabel = new JLabel("Orders for customer: " + customer.getName());
+        JLabel titleLabel = new JLabel(messages.getString("customers.ordersForCustomer") + " " + customer.getName());
         titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 14));
         headerPanel.add(titleLabel, BorderLayout.NORTH);
         
         JPanel infoPanel = new JPanel(new GridLayout(1, 3, 10, 0));
-        infoPanel.add(new JLabel("Contact: " + customer.getContact()));
-        infoPanel.add(new JLabel("Email: " + customer.getEmail()));
-        infoPanel.add(new JLabel("Address: " + customer.getAddress()));
+        infoPanel.add(new JLabel(messages.getString("customers.column.contact") + ": " + customer.getContact()));
+        infoPanel.add(new JLabel(messages.getString("customers.column.email") + ": " + customer.getEmail()));
+        infoPanel.add(new JLabel(messages.getString("customers.column.address") + ": " + customer.getAddress()));
         headerPanel.add(infoPanel, BorderLayout.SOUTH);
         
         // Table for orders
-        String[] columnNames = {"Order ID", "Date", "Total Amount", "Status"};
+        String[] columnNames = {
+            messages.getString("orders.column.id"),
+            messages.getString("orders.column.date"),
+            messages.getString("orders.column.totalAmount"),
+            messages.getString("orders.column.status")
+        };
+        
         DefaultTableModel orderTableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -339,6 +420,12 @@ public class CustomerView extends JPanel {
         JTable orderTable = new JTable(orderTableModel);
         orderTable.setFillsViewportHeight(true);
         
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            orderTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            orderTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         // Get orders for this customer
         List<Order> orders = controller.getOrdersByCustomer(customer.getId());
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -347,7 +434,7 @@ public class CustomerView extends JPanel {
             Object[] rowData = {
                 order.getId(),
                 dateFormat.format(order.getOrderDate()),
-                String.format("$%.2f", order.getTotalAmount()),
+                String.format("DZD %.2f", order.getTotalAmount()),
                 order.getStatus()
             };
             orderTableModel.addRow(rowData);
@@ -356,10 +443,10 @@ public class CustomerView extends JPanel {
         JScrollPane scrollPane = new JScrollPane(orderTable);
         scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton newOrderButton = new JButton("New Order");
-        JButton viewDetailsButton = new JButton("View Details");
-        JButton closeButton = new JButton("Close");
+        JPanel footerPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton newOrderButton = new JButton(messages.getString("orders.button.new"));
+        JButton viewDetailsButton = new JButton(messages.getString("orders.button.viewDetails"));
+        JButton closeButton = new JButton(messages.getString("button.close"));
         
         // Store customer reference for use in lambda
         Customer customerForOrder = customer;
@@ -387,8 +474,9 @@ public class CustomerView extends JPanel {
                 orderForm.setVisible(true);
             } else {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please select an order to view details.", 
-                    "No Selection", JOptionPane.WARNING_MESSAGE);
+                    messages.getString("orders.error.selectToView"), 
+                    messages.getString("dialog.noSelection"), 
+                    JOptionPane.WARNING_MESSAGE);
             }
         });
         closeButton.addActionListener(e -> dialog.dispose());
@@ -404,7 +492,6 @@ public class CustomerView extends JPanel {
         dialog.setVisible(true);
     }
 
-    
     public void refreshData() {
         loadAllCustomers();
     }

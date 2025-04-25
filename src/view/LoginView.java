@@ -3,8 +3,13 @@ package view;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Locale;
+
 import controller.UserController;
 import model.User;
+import util.LocaleManager;
+import util.Messages;
+import util.ArabicFontHelper;
 
 public class LoginView extends JFrame {
     
@@ -14,9 +19,20 @@ public class LoginView extends JFrame {
     private JButton loginButton;
     private JButton exitButton;
     private JLabel statusLabel;
+    private JButton languageButton;
+    private boolean isRightToLeft;
     
     public LoginView() {
-        setTitle("Stock Manager - Login");
+        // Set the locale and determine text direction
+        isRightToLeft = LocaleManager.getCurrentLocale().getLanguage().equals("ar");
+        
+        // Set component orientation based on locale
+        if (isRightToLeft) {
+            setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.setDefaultArabicFont();
+        }
+        
+        setTitle(Messages.getString("login.title"));
         setSize(400, 250);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -37,8 +53,19 @@ public class LoginView extends JFrame {
         usernameField = new JTextField(20);
         passwordField = new JPasswordField(20);
         
-        loginButton = new JButton("Login");
-        exitButton = new JButton("Exit");
+        // Set RTL for text fields if needed
+        if (isRightToLeft) {
+            usernameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            passwordField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        loginButton = new JButton(Messages.getString("button.login"));
+        exitButton = new JButton(Messages.getString("button.exit"));
+        
+        // Create language toggle button
+        String nextLanguage = isRightToLeft ? "English" : "العربية";
+        languageButton = new JButton(nextLanguage);
+        
         statusLabel = new JLabel(" ");
         statusLabel.setForeground(Color.RED);
         
@@ -54,6 +81,13 @@ public class LoginView extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 System.exit(0);
+            }
+        });
+        
+        languageButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                toggleLanguage();
             }
         });
         
@@ -74,9 +108,12 @@ public class LoginView extends JFrame {
         
         // Create logo or app title panel
         JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JLabel titleLabel = new JLabel("Stock Manager");
+        JLabel titleLabel = new JLabel(Messages.getString("app.title"));
         titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
         titlePanel.add(titleLabel);
+        
+        // Add language button to title panel
+        titlePanel.add(languageButton);
         
         // Create form panel
         JPanel formPanel = new JPanel();
@@ -88,7 +125,7 @@ public class LoginView extends JFrame {
         // Username row
         gc.gridx = 0;
         gc.gridy = 0;
-        formPanel.add(new JLabel("Username:"), gc);
+        formPanel.add(new JLabel(Messages.getString("login.username") + ":"), gc);
         
         gc.gridx = 1;
         gc.gridy = 0;
@@ -97,7 +134,7 @@ public class LoginView extends JFrame {
         // Password row
         gc.gridx = 0;
         gc.gridy = 1;
-        formPanel.add(new JLabel("Password:"), gc);
+        formPanel.add(new JLabel(Messages.getString("login.password") + ":"), gc);
         
         gc.gridx = 1;
         gc.gridy = 1;
@@ -122,6 +159,11 @@ public class LoginView extends JFrame {
         
         // Add main panel to frame
         add(mainPanel);
+        
+        // Apply Arabic font if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
     }
     
     private void login() {
@@ -130,7 +172,7 @@ public class LoginView extends JFrame {
         
         // Validate inputs
         if (username.isEmpty() || password.isEmpty()) {
-            statusLabel.setText("Username and password are required");
+            statusLabel.setText(Messages.getString("login.error.fieldsRequired"));
             return;
         }
         
@@ -139,7 +181,7 @@ public class LoginView extends JFrame {
         
         if (user != null) {
             if (!user.isActive()) {
-                statusLabel.setText("This account is inactive. Please contact administrator.");
+                statusLabel.setText(Messages.getString("login.error.inactiveAccount"));
                 return;
             }
             
@@ -153,9 +195,27 @@ public class LoginView extends JFrame {
                 mainFrame.setVisible(true);
             });
         } else {
-            statusLabel.setText("Invalid username or password");
+            statusLabel.setText(Messages.getString("login.error.invalidCredentials"));
             passwordField.setText("");
         }
+    }
+    
+    private void toggleLanguage() {
+        // Toggle between English and Arabic
+        if (isRightToLeft) {
+            // Switch to English
+            LocaleManager.setCurrentLocale(new Locale("en"));
+        } else {
+            // Switch to Arabic
+            LocaleManager.setCurrentLocale(new Locale("ar"));
+        }
+        
+        // Close current window and open a new one
+        dispose();
+        SwingUtilities.invokeLater(() -> {
+            LoginView loginView = new LoginView();
+            loginView.setVisible(true);
+        });
     }
     
     private void createDefaultAdminIfNeeded() {

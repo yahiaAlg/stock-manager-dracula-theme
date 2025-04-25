@@ -4,8 +4,12 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import controller.UserController;
 import model.User;
+import util.ArabicFontHelper;
+import util.LocaleManager;
 import util.PasswordUtil;
 
 public class UserProfileDialog extends JDialog {
@@ -23,12 +27,20 @@ public class UserProfileDialog extends JDialog {
     private User user;
     private UserController userController;
     private boolean profileUpdated = false;
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     public UserProfileDialog(JFrame parent, User user) {
-        super(parent, "User Profile", true);
+        super(parent, "", true); // Title will be set after loading resources
         
         this.user = user;
         this.userController = new UserController();
+        
+        // Load localization resources
+        loadLocalization();
+        
+        // Now set the title using the resource bundle
+        setTitle(messages.getString("profile.title"));
         
         initComponents();
         setupLayout();
@@ -37,6 +49,26 @@ public class UserProfileDialog extends JDialog {
         setSize(400, 350);
         setLocationRelativeTo(parent);
         setResizable(false);
+    }
+    
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this dialog
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this dialog
+        ArabicFontHelper.applyArabicFont(this);
     }
     
     private void initComponents() {
@@ -49,8 +81,18 @@ public class UserProfileDialog extends JDialog {
         emailField = new JTextField(20);
         fullNameField = new JTextField(20);
         
-        saveButton = new JButton("Save Changes");
-        cancelButton = new JButton("Cancel");
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            usernameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            currentPasswordField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            newPasswordField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            confirmPasswordField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            emailField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            fullNameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        saveButton = new JButton(messages.getString("profile.saveChanges"));
+        cancelButton = new JButton(messages.getString("button.cancel"));
         statusLabel = new JLabel(" ");
         statusLabel.setForeground(Color.RED);
         
@@ -83,7 +125,7 @@ public class UserProfileDialog extends JDialog {
         // Username row
         gc.gridx = 0;
         gc.gridy = 0;
-        formPanel.add(new JLabel("Username:"), gc);
+        formPanel.add(new JLabel(messages.getString("label.username")), gc);
         
         gc.gridx = 1;
         gc.gridy = 0;
@@ -92,7 +134,7 @@ public class UserProfileDialog extends JDialog {
         // Current Password row
         gc.gridx = 0;
         gc.gridy = 1;
-        formPanel.add(new JLabel("Current Password:"), gc);
+        formPanel.add(new JLabel(messages.getString("label.currentPassword")), gc);
         
         gc.gridx = 1;
         gc.gridy = 1;
@@ -101,7 +143,7 @@ public class UserProfileDialog extends JDialog {
         // New Password row
         gc.gridx = 0;
         gc.gridy = 2;
-        formPanel.add(new JLabel("New Password:"), gc);
+        formPanel.add(new JLabel(messages.getString("label.newPassword")), gc);
         
         gc.gridx = 1;
         gc.gridy = 2;
@@ -110,7 +152,7 @@ public class UserProfileDialog extends JDialog {
         // Confirm Password row
         gc.gridx = 0;
         gc.gridy = 3;
-        formPanel.add(new JLabel("Confirm Password:"), gc);
+        formPanel.add(new JLabel(messages.getString("label.confirmPassword")), gc);
         
         gc.gridx = 1;
         gc.gridy = 3;
@@ -119,7 +161,7 @@ public class UserProfileDialog extends JDialog {
         // Email row
         gc.gridx = 0;
         gc.gridy = 4;
-        formPanel.add(new JLabel("Email:"), gc);
+        formPanel.add(new JLabel(messages.getString("label.email")), gc);
         
         gc.gridx = 1;
         gc.gridy = 4;
@@ -128,7 +170,7 @@ public class UserProfileDialog extends JDialog {
         // Full Name row
         gc.gridx = 0;
         gc.gridy = 5;
-        formPanel.add(new JLabel("Full Name:"), gc);
+        formPanel.add(new JLabel(messages.getString("label.fullName")), gc);
         
         gc.gridx = 1;
         gc.gridy = 5;
@@ -140,9 +182,9 @@ public class UserProfileDialog extends JDialog {
         gc.gridwidth = 2;
         formPanel.add(statusLabel, gc);
         
-        // Create button panel
+        // Create button panel with proper flow direction based on language
         JPanel buttonPanel = new JPanel();
-        buttonPanel.setLayout(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setLayout(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         buttonPanel.add(saveButton);
         buttonPanel.add(cancelButton);
         
@@ -169,30 +211,30 @@ public class UserProfileDialog extends JDialog {
         
         // Validate inputs
         if (email.isEmpty() || fullName.isEmpty()) {
-            statusLabel.setText("Email and Full Name are required");
+            statusLabel.setText(messages.getString("error.emailFullNameRequired"));
             return;
         }
         
         // Validate current password if trying to change password
         if (!newPassword.isEmpty() || !confirmPassword.isEmpty()) {
             if (currentPassword.isEmpty()) {
-                statusLabel.setText("Current password is required to change password");
+                statusLabel.setText(messages.getString("error.currentPasswordRequired"));
                 return;
             }
             
             // Verify current password
             if (!PasswordUtil.verifyPassword(currentPassword, user.getPassword())) {
-                statusLabel.setText("Current password is incorrect");
+                statusLabel.setText(messages.getString("error.incorrectPassword"));
                 return;
             }
             
             if (!newPassword.equals(confirmPassword)) {
-                statusLabel.setText("New passwords do not match");
+                statusLabel.setText(messages.getString("error.passwordsDoNotMatch"));
                 return;
             }
             
             if (newPassword.length() < 6) {
-                statusLabel.setText("New password must be at least 6 characters");
+                statusLabel.setText(messages.getString("error.passwordTooShort"));
                 return;
             }
         }
@@ -212,12 +254,12 @@ public class UserProfileDialog extends JDialog {
         if (success) {
             profileUpdated = true;
             JOptionPane.showMessageDialog(this,
-                    "Profile updated successfully.",
-                    "Success",
+                    messages.getString("success.profileUpdated"),
+                    messages.getString("dialog.success"),
                     JOptionPane.INFORMATION_MESSAGE);
             dispose();
         } else {
-            statusLabel.setText("Failed to update profile");
+            statusLabel.setText(messages.getString("error.updateProfile"));
         }
     }
     

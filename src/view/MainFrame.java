@@ -16,13 +16,19 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import javax.swing.border.EmptyBorder;
 import util.DBConnection;
+import util.LocaleManager;
 
 public class MainFrame extends JFrame {
     
     private JTabbedPane tabbedPane;
     private JMenuBar menuBar;
     private User currentUser;
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     // Controllers
     private DashboardController dashboardController;
@@ -47,7 +53,10 @@ public class MainFrame extends JFrame {
     private UserManagementView userManagementView;
 
     public MainFrame(MainController mainController) {
-        setTitle("Stock Manager");
+        // Load localization resources
+        loadLocalization();
+        
+        setTitle(messages.getString("app.title"));
         setSize(1024, 768);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -70,6 +79,28 @@ public class MainFrame extends JFrame {
         });
     }
     
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for the whole application
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        JComponent.setDefaultLocale(new Locale("ar"));
+        
+        // Set default RTL for JOptionPane
+        UIManager.put("OptionPane.messageDialogTitle", messages.getString("dialog.title"));
+        UIManager.put("OptionPane.buttonOrientation", SwingConstants.RIGHT);
+    }
+    
     private void initControllers() {
         // Initialize all controllers
         dashboardController = new DashboardController();
@@ -87,25 +118,30 @@ public class MainFrame extends JFrame {
         // Initialize main tabbed pane
         tabbedPane = new JTabbedPane();
         
+        // Apply RTL padding if needed
+        if (isRightToLeft) {
+            tabbedPane.setBorder(new EmptyBorder(0, 0, 0, 5));
+        }
+        
         // Create placeholder panels for lazy loading
-        JPanel dashboardPlaceholder = createPlaceholderPanel("Loading Dashboard...");
-        JPanel categoriesPlaceholder = createPlaceholderPanel("Loading Categories...");
-        JPanel productsPlaceholder = createPlaceholderPanel("Loading Products...");
-        JPanel suppliersPlaceholder = createPlaceholderPanel("Loading Suppliers...");
-        JPanel customersPlaceholder = createPlaceholderPanel("Loading Customers...");
-        JPanel ordersPlaceholder = createPlaceholderPanel("Loading Orders...");
-        JPanel reportsPlaceholder = createPlaceholderPanel("Loading Reports...");
-        JPanel adjustmentsPlaceholder = createPlaceholderPanel("Loading Inventory Adjustments...");
+        JPanel dashboardPlaceholder = createPlaceholderPanel(messages.getString("loading.dashboard"));
+        JPanel categoriesPlaceholder = createPlaceholderPanel(messages.getString("loading.categories"));
+        JPanel productsPlaceholder = createPlaceholderPanel(messages.getString("loading.products"));
+        JPanel suppliersPlaceholder = createPlaceholderPanel(messages.getString("loading.suppliers"));
+        JPanel customersPlaceholder = createPlaceholderPanel(messages.getString("loading.customers"));
+        JPanel ordersPlaceholder = createPlaceholderPanel(messages.getString("loading.orders"));
+        JPanel reportsPlaceholder = createPlaceholderPanel(messages.getString("loading.reports"));
+        JPanel adjustmentsPlaceholder = createPlaceholderPanel(messages.getString("loading.adjustments"));
         
         // Add tabs with placeholders
-        tabbedPane.addTab("Dashboard", dashboardPlaceholder);
-        tabbedPane.addTab("Category", categoriesPlaceholder);
-        tabbedPane.addTab("Products", productsPlaceholder);
-        tabbedPane.addTab("Suppliers", suppliersPlaceholder);
-        tabbedPane.addTab("Customers", customersPlaceholder);
-        tabbedPane.addTab("Orders", ordersPlaceholder);
-        tabbedPane.addTab("Reports", reportsPlaceholder);
-        tabbedPane.addTab("Inventory Adjustments", adjustmentsPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.dashboard"), dashboardPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.categories"), categoriesPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.products"), productsPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.suppliers"), suppliersPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.customers"), customersPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.orders"), ordersPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.reports"), reportsPlaceholder);
+        tabbedPane.addTab(messages.getString("tab.adjustments"), adjustmentsPlaceholder);
         
         // User Management tab will be added only for admin users
         
@@ -174,7 +210,7 @@ public class MainFrame extends JFrame {
         });
         
         // Add Import Sample Data button at the bottom
-        JButton importSamplesButton = new JButton("Import Sample Data");
+        JButton importSamplesButton = new JButton(messages.getString("button.importSamples"));
         importSamplesButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -182,7 +218,7 @@ public class MainFrame extends JFrame {
             }
         });
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         buttonPanel.add(importSamplesButton);
         add(buttonPanel, BorderLayout.SOUTH);
         
@@ -192,13 +228,13 @@ public class MainFrame extends JFrame {
     
     private void importSampleData() {
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Select SQL Sample File");
+        fileChooser.setDialogTitle(messages.getString("dialog.selectSqlFile"));
         fileChooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
             public boolean accept(File f) {
                 return f.isDirectory() || f.getName().toLowerCase().endsWith(".sql");
             }
             public String getDescription() {
-                return "SQL Files (*.sql)";
+                return messages.getString("filter.sqlFiles");
             }
         });
         
@@ -223,8 +259,8 @@ public class MainFrame extends JFrame {
     private void clearDatabase() {
         int choice = JOptionPane.showConfirmDialog(
                 this,
-                "This will delete ALL data in the database. This action cannot be undone.\nAre you sure you want to continue?",
-                "Clear Database",
+                messages.getString("confirm.clearDatabase"),
+                messages.getString("title.clearDatabase"),
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE);
         
@@ -254,7 +290,8 @@ public class MainFrame extends JFrame {
                         // Replace with placeholders
                         for (int i = 0; i < tabbedPane.getTabCount(); i++) {
                             String tabTitle = tabbedPane.getTitleAt(i);
-                            tabbedPane.setComponentAt(i, createPlaceholderPanel("Loading " + tabTitle + "..."));
+                            tabbedPane.setComponentAt(i, createPlaceholderPanel(
+                                messages.getString("loading.generic").replace("{0}", tabTitle)));
                         }
                         
                         // Reload the current tab
@@ -263,12 +300,14 @@ public class MainFrame extends JFrame {
                         tabbedPane.setSelectedIndex(selectedIndex);
                         
                         JOptionPane.showMessageDialog(this, 
-                            "Database has been cleared successfully.",
-                            "Database Cleared", JOptionPane.INFORMATION_MESSAGE);
+                            messages.getString("success.databaseCleared"),
+                            messages.getString("title.databaseCleared"), 
+                            JOptionPane.INFORMATION_MESSAGE);
                     } else {
                         JOptionPane.showMessageDialog(this,
-                            "Could not delete database file. The file may be in use.",
-                            "Operation Failed", JOptionPane.ERROR_MESSAGE);
+                            messages.getString("error.deleteDatabase"),
+                            messages.getString("title.operationFailed"), 
+                            JOptionPane.ERROR_MESSAGE);
                         
                         // Reconnect to the database
                         DBConnection.getConnection();
@@ -277,14 +316,16 @@ public class MainFrame extends JFrame {
                     // If file doesn't exist, just create a new database
                     DBConnection.getConnection();
                     JOptionPane.showMessageDialog(this, 
-                        "A new database has been created.",
-                        "Database Reset", JOptionPane.INFORMATION_MESSAGE);
+                        messages.getString("info.newDatabaseCreated"),
+                        messages.getString("title.databaseReset"), 
+                        JOptionPane.INFORMATION_MESSAGE);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
                 JOptionPane.showMessageDialog(this,
-                    "Error clearing database: " + e.getMessage(),
-                    "Operation Failed", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("error.clearingDatabase") + e.getMessage(),
+                    messages.getString("title.operationFailed"), 
+                    JOptionPane.ERROR_MESSAGE);
                     
                 // Ensure connection is available
                 DBConnection.getConnection();
@@ -295,10 +336,10 @@ public class MainFrame extends JFrame {
     private void executeSqlFile(File file) {
         try {
             // Show progress dialog
-            JDialog progressDialog = new JDialog(this, "Importing Sample Data", true);
+            JDialog progressDialog = new JDialog(this, messages.getString("title.importingData"), true);
             JProgressBar progressBar = new JProgressBar();
             progressBar.setIndeterminate(true);
-            JLabel statusLabel = new JLabel("Reading SQL file...", JLabel.CENTER);
+            JLabel statusLabel = new JLabel(messages.getString("status.readingSqlFile"), JLabel.CENTER);
             
             progressDialog.setLayout(new BorderLayout());
             progressDialog.add(statusLabel, BorderLayout.CENTER);
@@ -318,7 +359,8 @@ public class MainFrame extends JFrame {
                         String line;
                         int statementCount = 0;
                         
-                        SwingUtilities.invokeLater(() -> statusLabel.setText("Executing SQL statements..."));
+                        SwingUtilities.invokeLater(() -> 
+                            statusLabel.setText(messages.getString("status.executingSql")));
                         
                         while ((line = reader.readLine()) != null) {
                             // Skip comments
@@ -338,7 +380,8 @@ public class MainFrame extends JFrame {
                                         statementCount++;
                                         final int count = statementCount;
                                         SwingUtilities.invokeLater(() -> 
-                                            statusLabel.setText("Executed " + count + " statements..."));
+                                            statusLabel.setText(messages.getString("status.executed")
+                                                .replace("{0}", String.valueOf(count))));
                                     } catch (SQLException ex) {
                                         System.err.println("Error executing: " + sql);
                                         System.err.println("Error message: " + ex.getMessage());
@@ -354,8 +397,10 @@ public class MainFrame extends JFrame {
                         SwingUtilities.invokeLater(() -> {
                             progressDialog.dispose();
                             JOptionPane.showMessageDialog(MainFrame.this, 
-                                "Successfully imported " + totalCount + " SQL statements.",
-                                "Import Complete", JOptionPane.INFORMATION_MESSAGE);
+                                messages.getString("success.importedSql")
+                                    .replace("{0}", String.valueOf(totalCount)),
+                                messages.getString("title.importComplete"), 
+                                JOptionPane.INFORMATION_MESSAGE);
                             
                             // Refresh the currently active view
                             refreshCurrentTab();
@@ -366,8 +411,9 @@ public class MainFrame extends JFrame {
                     SwingUtilities.invokeLater(() -> {
                         progressDialog.dispose();
                         JOptionPane.showMessageDialog(MainFrame.this,
-                            "Error importing sample data: " + ex.getMessage(),
-                            "Import Failed", JOptionPane.ERROR_MESSAGE);
+                            messages.getString("error.importingData") + ex.getMessage(),
+                            messages.getString("title.importFailed"), 
+                            JOptionPane.ERROR_MESSAGE);
                     });
                     
                     if (conn != null) {
@@ -394,8 +440,9 @@ public class MainFrame extends JFrame {
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this,
-                "Error importing sample data: " + e.getMessage(),
-                "Import Failed", JOptionPane.ERROR_MESSAGE);
+                messages.getString("error.importingData") + e.getMessage(),
+                messages.getString("title.importFailed"), 
+                JOptionPane.ERROR_MESSAGE);
         }
     }
     
@@ -403,13 +450,15 @@ public class MainFrame extends JFrame {
         menuBar = new JMenuBar();
         
         // Create File menu
-        JMenu fileMenu = new JMenu("File");
-        JMenuItem importSamplesMenuItem = new JMenuItem("Import Sample Data");
-        JMenuItem clearDatabaseMenuItem = new JMenuItem("Clear Database");
-        JMenuItem exitMenuItem = new JMenuItem("Exit");
+        JMenu fileMenu = new JMenu(messages.getString("menu.file"));
+        JMenuItem importSamplesMenuItem = new JMenuItem(messages.getString("menu.importSamples"));
+        JMenuItem clearDatabaseMenuItem = new JMenuItem(messages.getString("menu.clearDatabase"));
+        JMenuItem languageMenuItem = new JMenuItem(messages.getString("menu.language"));
+        JMenuItem exitMenuItem = new JMenuItem(messages.getString("menu.exit"));
         
         importSamplesMenuItem.addActionListener(e -> importSampleData());
         clearDatabaseMenuItem.addActionListener(e -> clearDatabase());
+        languageMenuItem.addActionListener(e -> showLanguageDialog());
         exitMenuItem.addActionListener(e -> {
             DBConnection.closeConnection();
             System.exit(0);
@@ -417,13 +466,14 @@ public class MainFrame extends JFrame {
         
         fileMenu.add(importSamplesMenuItem);
         fileMenu.add(clearDatabaseMenuItem);
+        fileMenu.add(languageMenuItem);
         fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         
         // Create User menu
-        JMenu userMenu = new JMenu("User");
-        JMenuItem profileMenuItem = new JMenuItem("Profile");
-        JMenuItem logoutMenuItem = new JMenuItem("Logout");
+        JMenu userMenu = new JMenu(messages.getString("menu.user"));
+        JMenuItem profileMenuItem = new JMenuItem(messages.getString("menu.profile"));
+        JMenuItem logoutMenuItem = new JMenuItem(messages.getString("menu.logout"));
         
         profileMenuItem.addActionListener(new ActionListener() {
             @Override
@@ -449,6 +499,57 @@ public class MainFrame extends JFrame {
         // Set the menu bar
         setJMenuBar(menuBar);
     }
+
+    // Helper method to determine the index of the current language
+    private int getLanguageIndex(Locale locale) {
+        String language = locale.getLanguage();
+        switch (language) {
+            case "ar": return 1;
+            case "fr": return 2;
+            default: return 0; // English is default
+        }
+    }
+    private void showLanguageDialog() {
+        String[] languages = {
+            messages.getString("language.english"),
+            messages.getString("language.arabic"),
+            messages.getString("language.french")
+        };
+        
+        String selectedLanguage = (String) JOptionPane.showInputDialog(
+            this,
+            messages.getString("dialog.selectLanguage"),
+            messages.getString("title.language"),
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            languages,
+            languages[getLanguageIndex(LocaleManager.getCurrentLocale())]
+        );
+        
+        if (selectedLanguage != null) {
+            Locale newLocale;
+            if (selectedLanguage.equals(messages.getString("language.arabic"))) {
+                newLocale = new Locale("ar");
+            } else if (selectedLanguage.equals(messages.getString("language.french"))) {
+                newLocale = new Locale("fr");
+            } else {
+                newLocale = new Locale("en");
+            }
+            
+            // Only reload if the locale changed
+            if (!newLocale.equals(LocaleManager.getCurrentLocale())) {
+                LocaleManager.setCurrentLocale(newLocale);
+                
+                // Inform user to restart application
+                JOptionPane.showMessageDialog(
+                    this,
+                    messages.getString("info.restartRequired"),
+                    messages.getString("title.languageChanged"),
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+            }
+        }
+    }
     
     private void showUserProfileDialog() {
         if (currentUser != null) {
@@ -466,8 +567,8 @@ public class MainFrame extends JFrame {
         // Show confirmation dialog
         int choice = JOptionPane.showConfirmDialog(
                 this,
-                "Are you sure you want to logout?",
-                "Confirm Logout",
+                messages.getString("confirm.logout"),
+                messages.getString("title.confirmLogout"),
                 JOptionPane.YES_NO_OPTION);
         
         if (choice == JOptionPane.YES_OPTION) {
@@ -543,22 +644,25 @@ public class MainFrame extends JFrame {
         
         // Update title to include username
         if (currentUser != null) {
-            setTitle("Stock Manager - Logged in as: " + currentUser.getUsername() + " (" + currentUser.getRole() + ")");
+            setTitle(messages.getString("app.titleWithUser")
+                .replace("{0}", currentUser.getUsername())
+                .replace("{1}", currentUser.getRole()));
             
             // Add User Management tab for Admin users
             if (currentUser.getRole().equalsIgnoreCase("Admin")) {
                 // Check if the tab already exists
                 boolean tabExists = false;
                 for (int i = 0; i < tabbedPane.getTabCount(); i++) {
-                    if (tabbedPane.getTitleAt(i).equals("User Management")) {
+                    if (tabbedPane.getTitleAt(i).equals(messages.getString("tab.userManagement"))) {
                         tabExists = true;
                         break;
                     }
                 }
                 
                 if (!tabExists) {
-                    JPanel userManagementPlaceholder = createPlaceholderPanel("Loading User Management...");
-                    tabbedPane.addTab("User Management", userManagementPlaceholder);
+                    JPanel userManagementPlaceholder = createPlaceholderPanel(
+                        messages.getString("loading.userManagement"));
+                    tabbedPane.addTab(messages.getString("tab.userManagement"), userManagementPlaceholder);
                 }
             }
         }
@@ -599,7 +703,7 @@ public class MainFrame extends JFrame {
         private boolean profileUpdated = false;
         
         public UserProfileDialog(JFrame parent, User user) {
-            super(parent, "User Profile", true);
+            super(parent, messages.getString("dialog.userProfile"), true);
             
             this.user = user;
             
@@ -610,6 +714,15 @@ public class MainFrame extends JFrame {
             setSize(400, 350);
             setLocationRelativeTo(parent);
             setResizable(false);
+            
+            // Set component orientation for RTL if needed
+            if (isRightToLeft) {
+                applyDialogRtlSupport();
+            }
+        }
+        
+        private void applyDialogRtlSupport() {
+            this.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
         }
         
         private void initComponents() {
@@ -622,8 +735,8 @@ public class MainFrame extends JFrame {
             emailField = new JTextField(20);
             fullNameField = new JTextField(20);
             
-            saveButton = new JButton("Save Changes");
-            cancelButton = new JButton("Cancel");
+            saveButton = new JButton(messages.getString("button.saveChanges"));
+            cancelButton = new JButton(messages.getString("button.cancel"));
             statusLabel = new JLabel(" ");
             statusLabel.setForeground(Color.RED);
             
@@ -656,7 +769,7 @@ public class MainFrame extends JFrame {
             // Username row
             gc.gridx = 0;
             gc.gridy = 0;
-            formPanel.add(new JLabel("Username:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.username")), gc);
             
             gc.gridx = 1;
             gc.gridy = 0;
@@ -665,7 +778,7 @@ public class MainFrame extends JFrame {
             // Current Password row
             gc.gridx = 0;
             gc.gridy = 1;
-            formPanel.add(new JLabel("Current Password:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.currentPassword")), gc);
             
             gc.gridx = 1;
             gc.gridy = 1;
@@ -674,7 +787,7 @@ public class MainFrame extends JFrame {
             // New Password row
             gc.gridx = 0;
             gc.gridy = 2;
-            formPanel.add(new JLabel("New Password:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.newPassword")), gc);
             
             gc.gridx = 1;
             gc.gridy = 2;
@@ -683,7 +796,7 @@ public class MainFrame extends JFrame {
             // Confirm Password row
             gc.gridx = 0;
             gc.gridy = 3;
-            formPanel.add(new JLabel("Confirm Password:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.confirmPassword")), gc);
             
             gc.gridx = 1;
             gc.gridy = 3;
@@ -692,7 +805,7 @@ public class MainFrame extends JFrame {
             // Email row
             gc.gridx = 0;
             gc.gridy = 4;
-            formPanel.add(new JLabel("Email:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.email")), gc);
             
             gc.gridx = 1;
             gc.gridy = 4;
@@ -701,7 +814,7 @@ public class MainFrame extends JFrame {
             // Full Name row
             gc.gridx = 0;
             gc.gridy = 5;
-            formPanel.add(new JLabel("Full Name:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.fullName")), gc);
             
             gc.gridx = 1;
             gc.gridy = 5;
@@ -742,34 +855,33 @@ public class MainFrame extends JFrame {
             
             // Validate inputs
             if (email.isEmpty() || fullName.isEmpty()) {
-                statusLabel.setText("Email and Full Name are required");
+                statusLabel.setText(messages.getString("error.emailFullNameRequired"));
                 return;
             }
             
             // Validate current password if trying to change password
             if (!newPassword.isEmpty() || !confirmPassword.isEmpty()) {
                 if (currentPassword.isEmpty()) {
-                    statusLabel.setText("Current password is required to change password");
+                    statusLabel.setText(messages.getString("error.currentPasswordRequired"));
                     return;
                 }
                 
                 // Verify current password
                 User tempUser = new User();
-                tempUser.setUsername(user.getUsername());
                 tempUser.setPassword(currentPassword);
                 
                 User authenticatedUser = userController.authenticate(user.getUsername(), currentPassword);
                 if (authenticatedUser == null) {
-                    statusLabel.setText("Current password is incorrect");
+                    statusLabel.setText(messages.getString("error.incorrectPassword"));
                     return;
                 }
                 
                 if (!newPassword.equals(confirmPassword)) {
-                    statusLabel.setText("New passwords do not match");
+                    statusLabel.setText(messages.getString("error.passwordsDoNotMatch"));
                     return;
                 }
                 if (newPassword.length() < 6) {
-                    statusLabel.setText("New password must be at least 6 characters");
+                    statusLabel.setText(messages.getString("error.passwordTooShort"));
                     return;
                 }
             }
@@ -789,12 +901,12 @@ public class MainFrame extends JFrame {
             if (success) {
                 profileUpdated = true;
                 JOptionPane.showMessageDialog(this,
-                        "Profile updated successfully.",
-                        "Success",
+                        messages.getString("success.profileUpdated"),
+                        messages.getString("title.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                 dispose();
             } else {
-                statusLabel.setText("Failed to update profile");
+                statusLabel.setText(messages.getString("error.updateProfile"));
             }
         }
         

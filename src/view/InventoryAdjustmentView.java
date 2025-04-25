@@ -14,6 +14,9 @@ import java.awt.event.MouseEvent;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import util.ArabicFontHelper;
 
 public class InventoryAdjustmentView extends JPanel {
     
@@ -40,14 +43,42 @@ public class InventoryAdjustmentView extends JPanel {
     
     private List<InventoryAdjustment> currentAdjustments;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     public InventoryAdjustmentView(InventoryAdjustmentController controller) {
         this.controller = controller;
+        
+        // Load localization resources
+        loadLocalization();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
         initComponents();
         loadAllAdjustments();
+    }
+    
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = util.LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this panel
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this panel if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
     }
     
     private void initComponents() {
@@ -68,16 +99,21 @@ public class InventoryAdjustmentView extends JPanel {
     
     private JPanel createSearchPanel() {
         JPanel searchPanel = new JPanel(new BorderLayout(5, 10));
-        searchPanel.setBorder(BorderFactory.createTitledBorder("Search Inventory Adjustments"));
+        searchPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("adjustments.searchTitle")));
         
         // Product filter
-        JPanel productPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        productPanel.add(new JLabel("Product:"));
+        JPanel productPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
+        productPanel.add(new JLabel(messages.getString("adjustments.filter.product") + ":"));
         productComboBox = new JComboBox<>();
         productComboBox.setPreferredSize(new Dimension(200, 25));
         
+        // Apply RTL to combo box if needed
+        if (isRightToLeft) {
+            productComboBox.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         // Add "All Products" option
-        productComboBox.addItem(new Product(0, "All Products", "ALL", 0, 0, 0.0, 0, 0));
+        productComboBox.addItem(new Product(0, messages.getString("adjustments.allProducts"), "ALL", 0, 0, 0.0, 0, 0));
         // Load products from database
         List<Product> products = controller.getAllProducts();
         for (Product product : products) {
@@ -87,10 +123,10 @@ public class InventoryAdjustmentView extends JPanel {
         productPanel.add(productComboBox);
         
         // Date range filter
-        JPanel datePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        datePanel.add(new JLabel("Date Range:"));
+        JPanel datePanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
+        datePanel.add(new JLabel(messages.getString("adjustments.filter.dateRange") + ":"));
 
-        // Initialize the class fields instead of creating local variables
+        // Initialize the class fields
         startDateChooser = new JDateChooser();
         startDateChooser.setPreferredSize(new Dimension(130, 25));
         startDateChooser.setDateFormatString("yyyy-MM-dd");
@@ -100,28 +136,44 @@ public class InventoryAdjustmentView extends JPanel {
         endDateChooser.setDateFormatString("yyyy-MM-dd");
 
         datePanel.add(startDateChooser);
-        datePanel.add(new JLabel("to"));
+        datePanel.add(new JLabel(messages.getString("common.to")));
         datePanel.add(endDateChooser);
         
         // Reason filter
-        JPanel reasonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        reasonPanel.add(new JLabel("Reason:"));
+        JPanel reasonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
+        reasonPanel.add(new JLabel(messages.getString("adjustments.filter.reason") + ":"));
         reasonField = new JTextField(20);
+        
+        // Apply RTL to text field if needed
+        if (isRightToLeft) {
+            reasonField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         reasonPanel.add(reasonField);
         
         // Quantity range filter
-        JPanel qtyPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        qtyPanel.add(new JLabel("Quantity Range:"));
+        JPanel qtyPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
+        qtyPanel.add(new JLabel(messages.getString("adjustments.filter.quantityRange") + ":"));
         minQtyField = new JTextField(5);
+        
         qtyPanel.add(minQtyField);
-        qtyPanel.add(new JLabel("to"));
+        qtyPanel.add(new JLabel(messages.getString("common.to")));
         maxQtyField = new JTextField(5);
         qtyPanel.add(maxQtyField);
+
+
+        // Apply RTL to text fields if needed
+        if (isRightToLeft) {
+            minQtyField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            maxQtyField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+
         
         // Search and clear buttons
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        searchButton = new JButton("Search");
-        clearButton = new JButton("Clear");
+        JPanel buttonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        searchButton = new JButton(messages.getString("button.search"));
+        clearButton = new JButton(messages.getString("button.clear"));
         
         searchButton.addActionListener(this::onSearchButtonClicked);
         clearButton.addActionListener(e -> {
@@ -152,9 +204,16 @@ public class InventoryAdjustmentView extends JPanel {
     
     private JPanel createTablePanel() {
         JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Adjustment History"));
+        tablePanel.setBorder(BorderFactory.createTitledBorder(messages.getString("adjustments.historyTitle")));
         
-        String[] columnNames = {"ID", "Product", "Date", "Quantity Change", "Reason"};
+        String[] columnNames = {
+            messages.getString("column.id"),
+            messages.getString("column.product"),
+            messages.getString("column.date"),
+            messages.getString("adjustments.column.quantityChange"),
+            messages.getString("adjustments.column.reason")
+        };
+        
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -171,6 +230,12 @@ public class InventoryAdjustmentView extends JPanel {
         adjustmentTable = new JTable(tableModel);
         adjustmentTable.setFillsViewportHeight(true);
         adjustmentTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            adjustmentTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            adjustmentTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Double-click to edit
         adjustmentTable.addMouseListener(new MouseAdapter() {
@@ -222,11 +287,11 @@ public class InventoryAdjustmentView extends JPanel {
     }
     
     private JPanel createButtonsPanel() {
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         
-        addButton = new JButton("Add Adjustment");
-        editButton = new JButton("Edit");
-        deleteButton = new JButton("Delete");
+        addButton = new JButton(messages.getString("adjustments.button.add"));
+        editButton = new JButton(messages.getString("button.edit"));
+        deleteButton = new JButton(messages.getString("button.delete"));
         
         addButton.addActionListener(e -> showAdjustmentDialog(null));
         editButton.addActionListener(this::onEditButtonClicked);
@@ -270,10 +335,7 @@ public class InventoryAdjustmentView extends JPanel {
             // Get dates from date choosers
             Date startDate = startDateChooser.getDate();
             Date endDate = endDateChooser.getDate();
-            // Add these debug prints
-            System.out.println("DEBUG - Search with dates: Start=" + 
-                (startDate != null ? dateFormat.format(startDate) : "null") + 
-                ", End=" + (endDate != null ? dateFormat.format(endDate) : "null"));
+            
             // Get reason filter
             String reason = reasonField.getText().trim().isEmpty() ? null : reasonField.getText().trim();
             
@@ -295,8 +357,8 @@ public class InventoryAdjustmentView extends JPanel {
             
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this,
-                "Invalid number format for quantity filters.",
-                "Input Error",
+                messages.getString("adjustments.error.invalidNumber"),
+                messages.getString("dialog.inputError"),
                 JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -308,8 +370,9 @@ public class InventoryAdjustmentView extends JPanel {
             showAdjustmentDialog(selectedAdjustment);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select an adjustment to edit.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("adjustments.error.selectToEdit"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -319,40 +382,48 @@ public class InventoryAdjustmentView extends JPanel {
             InventoryAdjustment selectedAdjustment = currentAdjustments.get(selectedRow);
             
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete this adjustment?\n" +
-                "This will revert the inventory change of " + selectedAdjustment.getChangeQty() + 
-                " units for " + selectedAdjustment.getProductName() + ".",
-                "Confirm Deletion",
+                messages.getString("adjustments.confirm.delete")
+                    .replace("{0}", String.valueOf(selectedAdjustment.getChangeQty()))
+                    .replace("{1}", selectedAdjustment.getProductName()),
+                messages.getString("dialog.confirmDeletion"),
                 JOptionPane.YES_NO_OPTION);
                 
             if (confirm == JOptionPane.YES_OPTION) {
                 boolean success = controller.deleteAdjustment(selectedAdjustment.getId());
                 if (success) {
                     JOptionPane.showMessageDialog(this,
-                        "Adjustment deleted successfully.",
-                        "Success",
+                        messages.getString("adjustments.success.deleted"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     loadAllAdjustments();
                 } else {
                     JOptionPane.showMessageDialog(this,
-                        "Error deleting adjustment.",
-                        "Error",
+                        messages.getString("adjustments.error.delete"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             }
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select an adjustment to delete.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("adjustments.error.selectToDelete"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
     private void showAdjustmentDialog(InventoryAdjustment adjustment) {
         // Create dialog
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Adjustment Details");
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
+            messages.getString("dialog.adjustmentDetails"));
         dialog.setLayout(new BorderLayout());
         dialog.setSize(450, 300);
         dialog.setLocationRelativeTo(this);
+        
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
         
         JPanel formPanel = new JPanel();
         formPanel.setLayout(new GridLayout(5, 2, 10, 10));
@@ -361,9 +432,16 @@ public class InventoryAdjustmentView extends JPanel {
         // Form fields
         JTextField idField = new JTextField();
         JComboBox<Product> productField = new JComboBox<>();
-        JDateChooser dateChooser = new JDateChooser(); // Replace JTextField with JDateChooser
+        JDateChooser dateChooser = new JDateChooser();
         JSpinner quantityField = new JSpinner(new SpinnerNumberModel(0, -1000, 1000, 1));
         JTextArea reasonField = new JTextArea();
+        
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            idField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            productField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            reasonField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // ID is not editable
         idField.setEditable(false);
@@ -374,7 +452,6 @@ public class InventoryAdjustmentView extends JPanel {
             productField.addItem(product);
         }
         
-        // Set current date for new adjustments
         // Set current date for new adjustments
         if (adjustment == null) {
             idField.setText("0");
@@ -399,16 +476,17 @@ public class InventoryAdjustmentView extends JPanel {
             // Disable product change for existing adjustments
             productField.setEnabled(false);
         }
+        
         // Add fields to form
-        formPanel.add(new JLabel("ID:"));
+        formPanel.add(new JLabel(messages.getString("column.id") + ":"));
         formPanel.add(idField);
-        formPanel.add(new JLabel("Product:"));
+        formPanel.add(new JLabel(messages.getString("column.product") + ":"));
         formPanel.add(productField);
-        formPanel.add(new JLabel("Date:"));
+        formPanel.add(new JLabel(messages.getString("column.date") + ":"));
         formPanel.add(dateChooser);
-        formPanel.add(new JLabel("Quantity Change:"));
+        formPanel.add(new JLabel(messages.getString("adjustments.label.quantityChange") + ":"));
         formPanel.add(quantityField);
-        formPanel.add(new JLabel("Reason:"));
+        formPanel.add(new JLabel(messages.getString("adjustments.column.reason") + ":"));
         
         // Use scroll pane for reason text area
         JScrollPane reasonScrollPane = new JScrollPane(reasonField);
@@ -417,17 +495,17 @@ public class InventoryAdjustmentView extends JPanel {
         formPanel.add(reasonScrollPane);
         
         // Button panel
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton saveButton = new JButton("Save");
-        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton saveButton = new JButton(messages.getString("button.save"));
+        JButton cancelButton = new JButton(messages.getString("button.cancel"));
         
         saveButton.addActionListener(e -> {
             try {
                 // Validate input
                 if (reasonField.getText().trim().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Reason is required.", 
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("adjustments.error.reasonRequired"), 
+                        messages.getString("dialog.validationError"), JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -435,8 +513,8 @@ public class InventoryAdjustmentView extends JPanel {
                 Date date = dateChooser.getDate();
                 if (date == null) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Please select a date.", 
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("adjustments.error.dateRequired"), 
+                        messages.getString("dialog.validationError"), JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -456,23 +534,24 @@ public class InventoryAdjustmentView extends JPanel {
                 
                 if (success) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Adjustment saved successfully.",
-                        "Success",
+                        messages.getString("adjustments.success.saved"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadAllAdjustments();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Error saving adjustment.",
-                        "Error",
+                        messages.getString("adjustments.error.save"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please enter valid numeric values.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("error.invalidNumber"), 
+                    messages.getString("dialog.inputError"), JOptionPane.ERROR_MESSAGE);
             }
         });
+        
         cancelButton.addActionListener(e -> dialog.dispose());
         
         buttonPanel.add(saveButton);

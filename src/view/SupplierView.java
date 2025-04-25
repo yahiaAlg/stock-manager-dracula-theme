@@ -11,6 +11,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import util.ArabicFontHelper;
 
 public class SupplierView extends JPanel {
     
@@ -28,9 +31,15 @@ public class SupplierView extends JPanel {
     private JButton viewProductsButton;
     
     private List<Supplier> currentSuppliers;
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     public SupplierView(SupplierController controller) {
         this.controller = controller;
+        
+        // Load localization resources
+        loadLocalization();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
@@ -38,20 +47,46 @@ public class SupplierView extends JPanel {
         loadAllSuppliers();
     }
     
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = util.LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this panel
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this panel if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
+    }
+    
     private void initComponents() {
         // Search panel (top)
         JPanel searchPanel = new JPanel(new BorderLayout(5, 0));
-        searchPanel.setBorder(BorderFactory.createTitledBorder("Search Suppliers"));
+        searchPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("suppliers.searchTitle")));
         
-        JPanel searchFieldPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel searchFieldPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
         
         searchField = new JTextField(30);
-        searchFieldPanel.add(new JLabel("Search:"));
+        if (isRightToLeft) {
+            searchField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        searchFieldPanel.add(new JLabel(messages.getString("common.search") + ":"));
         searchFieldPanel.add(searchField);
         
-        JPanel searchButtonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        searchButton = new JButton("Search");
-        clearButton = new JButton("Clear");
+        JPanel searchButtonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        searchButton = new JButton(messages.getString("button.search"));
+        clearButton = new JButton(messages.getString("button.clear"));
         
         searchButton.addActionListener(this::onSearchButtonClicked);
         clearButton.addActionListener(e -> {
@@ -67,9 +102,15 @@ public class SupplierView extends JPanel {
         
         // Table panel (center)
         JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Suppliers"));
+        tablePanel.setBorder(BorderFactory.createTitledBorder(messages.getString("suppliers.title")));
         
-        String[] columnNames = {"ID", "Name", "Contact", "Address"};
+        String[] columnNames = {
+            messages.getString("column.id"), 
+            messages.getString("suppliers.column.name"), 
+            messages.getString("suppliers.column.contact"),
+            messages.getString("suppliers.column.address")
+        };
+        
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -80,6 +121,12 @@ public class SupplierView extends JPanel {
         supplierTable = new JTable(tableModel);
         supplierTable.setFillsViewportHeight(true);
         supplierTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            supplierTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            supplierTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Add double-click listener for editing
         supplierTable.addMouseListener(new MouseAdapter() {
@@ -95,12 +142,12 @@ public class SupplierView extends JPanel {
         tablePanel.add(scrollPane, BorderLayout.CENTER);
         
         // Buttons panel (bottom)
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         
-        addButton = new JButton("Add Supplier");
-        editButton = new JButton("Edit");
-        deleteButton = new JButton("Delete");
-        viewProductsButton = new JButton("View Products");
+        addButton = new JButton(messages.getString("suppliers.button.add"));
+        editButton = new JButton(messages.getString("button.edit"));
+        deleteButton = new JButton(messages.getString("button.delete"));
+        viewProductsButton = new JButton(messages.getString("suppliers.button.viewProducts"));
         
         addButton.addActionListener(e -> showSupplierDialog(null));
         editButton.addActionListener(this::onEditButtonClicked);
@@ -142,6 +189,7 @@ public class SupplierView extends JPanel {
     public void refreshData() {
         loadAllSuppliers();
     }
+    
     private void onSearchButtonClicked(ActionEvent e) {
         String searchTerm = searchField.getText().trim();
         
@@ -160,8 +208,9 @@ public class SupplierView extends JPanel {
             showSupplierDialog(selectedSupplier);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a supplier to edit.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("error.noSelection"),
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -171,29 +220,30 @@ public class SupplierView extends JPanel {
             Supplier selectedSupplier = currentSuppliers.get(selectedRow);
             
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete the supplier: " + selectedSupplier.getName() + "?",
-                "Confirm Deletion",
+                messages.getString("suppliers.confirm.delete").replace("{0}", selectedSupplier.getName()),
+                messages.getString("dialog.confirmDeletion"),
                 JOptionPane.YES_NO_OPTION);
                 
             if (confirm == JOptionPane.YES_OPTION) {
                 boolean success = controller.deleteSupplier(selectedSupplier.getId());
                 if (success) {
                     JOptionPane.showMessageDialog(this,
-                        "Supplier deleted successfully.",
-                        "Success",
+                        messages.getString("suppliers.success.deleted"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     loadAllSuppliers();
                 } else {
                     JOptionPane.showMessageDialog(this,
-                        "Error deleting supplier. It may have associated products.",
-                        "Error",
+                        messages.getString("suppliers.error.delete"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             }
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a supplier to delete.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("suppliers.error.selectToDelete"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -204,17 +254,25 @@ public class SupplierView extends JPanel {
             showProductsDialog(selectedSupplier);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a supplier to view products.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("suppliers.error.selectToViewProducts"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
     private void showSupplierDialog(Supplier supplier) {
         // Create a dialog for adding/editing suppliers
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Supplier Details");
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
+            messages.getString("dialog.supplierDetails"));
         dialog.setLayout(new BorderLayout());
         dialog.setSize(400, 300);
         dialog.setLocationRelativeTo(this);
+        
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
         
         JPanel formPanel = new JPanel(new GridLayout(4, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -225,6 +283,14 @@ public class SupplierView extends JPanel {
         JTextArea addressField = new JTextArea();
         addressField.setLineWrap(true);
         addressField.setWrapStyleWord(true);
+        
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            idField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            nameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            contactField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            addressField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Populate fields if editing
         if (supplier != null) {
@@ -240,26 +306,27 @@ public class SupplierView extends JPanel {
         // ID is not editable
         idField.setEditable(false);
         
-        formPanel.add(new JLabel("ID:"));
+        formPanel.add(new JLabel(messages.getString("column.id") + ":"));
         formPanel.add(idField);
-        formPanel.add(new JLabel("Name:"));
+        formPanel.add(new JLabel(messages.getString("suppliers.column.name") + ":"));
         formPanel.add(nameField);
-        formPanel.add(new JLabel("Contact:"));
+        formPanel.add(new JLabel(messages.getString("suppliers.column.contact") + ":"));
         formPanel.add(contactField);
-        formPanel.add(new JLabel("Address:"));
+        formPanel.add(new JLabel(messages.getString("suppliers.column.address") + ":"));
         formPanel.add(new JScrollPane(addressField)); // Use scroll pane for text area
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton saveButton = new JButton("Save");
-        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton saveButton = new JButton(messages.getString("button.save"));
+        JButton cancelButton = new JButton(messages.getString("button.cancel"));
         
         saveButton.addActionListener(e -> {
             try {
                 // Validate input
                 if (nameField.getText().trim().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Name is a required field.", 
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("suppliers.error.nameRequired"), 
+                        messages.getString("dialog.validationError"), 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -273,21 +340,22 @@ public class SupplierView extends JPanel {
                 
                 if (success) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Supplier saved successfully.",
-                        "Success",
+                        messages.getString("suppliers.success.saved"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadAllSuppliers();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Error saving supplier. Please check your inputs.",
-                        "Error",
+                        messages.getString("suppliers.error.save"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please enter valid values.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("error.invalidNumber"), 
+                    messages.getString("dialog.inputError"), 
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         
@@ -304,25 +372,40 @@ public class SupplierView extends JPanel {
     
     private void showProductsDialog(Supplier supplier) {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
-            "Products from " + supplier.getName());
+            messages.getString("suppliers.dialog.productsFrom") + " " + supplier.getName());
         dialog.setLayout(new BorderLayout());
         dialog.setSize(800, 500);
         dialog.setLocationRelativeTo(this);
         
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
+        
         JPanel headerPanel = new JPanel(new BorderLayout());
         headerPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JLabel titleLabel = new JLabel("Products supplied by: " + supplier.getName());
+        JLabel titleLabel = new JLabel(messages.getString("suppliers.label.productsSuppliedBy") + " " + supplier.getName());
         titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 14));
         headerPanel.add(titleLabel, BorderLayout.NORTH);
         
         JPanel infoPanel = new JPanel(new GridLayout(1, 2, 10, 0));
-        infoPanel.add(new JLabel("Contact: " + supplier.getContact()));
-        infoPanel.add(new JLabel("Address: " + supplier.getAddress()));
+        infoPanel.add(new JLabel(messages.getString("suppliers.column.contact") + ": " + supplier.getContact()));
+        infoPanel.add(new JLabel(messages.getString("suppliers.column.address") + ": " + supplier.getAddress()));
         headerPanel.add(infoPanel, BorderLayout.SOUTH);
         
         // Table for products
-        String[] columnNames = {"ID", "SKU", "Name", "Category", "Unit Price", "Stock Qty", "Reorder Level"};
+        String[] columnNames = {
+            messages.getString("column.id"), 
+            messages.getString("products.column.sku"), 
+            messages.getString("products.column.name"),
+            messages.getString("products.column.category"),
+            messages.getString("products.column.price"),
+            messages.getString("products.column.stockQty"),
+            messages.getString("products.column.reorderLevel")
+        };
+        
         DefaultTableModel productTableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -333,6 +416,12 @@ public class SupplierView extends JPanel {
         JTable productTable = new JTable(productTableModel);
         productTable.setFillsViewportHeight(true);
         
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            productTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            productTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         // Get products for this supplier
         List<Product> products = controller.getProductsBySupplier(supplier.getId());
         
@@ -342,7 +431,7 @@ public class SupplierView extends JPanel {
                 product.getSku(),
                 product.getName(),
                 product.getCategoryName(),
-                String.format("$%.2f", product.getUnitPrice()),
+                String.format("DZD %.2f", product.getUnitPrice()),
                 product.getStockQty(),
                 product.getReorderLevel()
             };
@@ -352,8 +441,8 @@ public class SupplierView extends JPanel {
         JScrollPane scrollPane = new JScrollPane(productTable);
         scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        JPanel footerPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton closeButton = new JButton("Close");
+        JPanel footerPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton closeButton = new JButton(messages.getString("button.close"));
         closeButton.addActionListener(e -> dialog.dispose());
         footerPanel.add(closeButton);
         
@@ -363,5 +452,4 @@ public class SupplierView extends JPanel {
         
         dialog.setVisible(true);
     }
-
 }

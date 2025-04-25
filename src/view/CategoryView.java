@@ -10,6 +10,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
+import util.ArabicFontHelper;
 
 public class CategoryView extends JPanel {
     
@@ -27,9 +30,15 @@ public class CategoryView extends JPanel {
     private JButton deleteButton;
     
     private List<Category> currentCategories;
+    private ResourceBundle messages;
+    private boolean isRightToLeft;
     
     public CategoryView(CategoryController controller) {
         this.controller = controller;
+        
+        // Load localization resources
+        loadLocalization();
+        
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
@@ -37,20 +46,46 @@ public class CategoryView extends JPanel {
         loadAllCategories();
     }
     
+    private void loadLocalization() {
+        // Get current locale from LocaleManager
+        Locale currentLocale = util.LocaleManager.getCurrentLocale();
+        messages = ResourceBundle.getBundle("resources.Messages", currentLocale);
+        
+        // Configure component orientation based on locale
+        isRightToLeft = currentLocale.getLanguage().equals("ar");
+        if (isRightToLeft) {
+            applyRightToLeftOrientation();
+        }
+    }
+    
+    private void applyRightToLeftOrientation() {
+        // Set right-to-left orientation for this panel
+        setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // Apply Arabic font to this panel if needed
+        if (isRightToLeft) {
+            ArabicFontHelper.applyArabicFont(this);
+        }
+    }
+    
     private void initComponents() {
         // Search panel (top)
         JPanel searchPanel = new JPanel(new BorderLayout(5, 0));
-        searchPanel.setBorder(BorderFactory.createTitledBorder("Search Categories"));
+        searchPanel.setBorder(BorderFactory.createTitledBorder(messages.getString("categories.searchTitle")));
         
-        JPanel searchFieldPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel searchFieldPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.RIGHT : FlowLayout.LEFT));
         
         searchField = new JTextField(30);
-        searchFieldPanel.add(new JLabel("Search:"));
+        if (isRightToLeft) {
+            searchField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
+        searchFieldPanel.add(new JLabel(messages.getString("common.search") + ":"));
         searchFieldPanel.add(searchField);
         
-        JPanel searchButtonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        searchButton = new JButton("Search");
-        clearButton = new JButton("Clear");
+        JPanel searchButtonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        searchButton = new JButton(messages.getString("button.search"));
+        clearButton = new JButton(messages.getString("button.clear"));
         
         searchButton.addActionListener(this::onSearchButtonClicked);
         clearButton.addActionListener(e -> {
@@ -66,9 +101,14 @@ public class CategoryView extends JPanel {
         
         // Table panel (center)
         JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Categories"));
+        tablePanel.setBorder(BorderFactory.createTitledBorder(messages.getString("categories.title")));
         
-        String[] columnNames = {"ID", "Name", "Description"};
+        String[] columnNames = {
+            messages.getString("column.id"), 
+            messages.getString("categories.column.name"), 
+            messages.getString("categories.column.description")
+        };
+        
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -79,6 +119,12 @@ public class CategoryView extends JPanel {
         categoryTable = new JTable(tableModel);
         categoryTable.setFillsViewportHeight(true);
         categoryTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        
+        // Apply RTL to table if needed
+        if (isRightToLeft) {
+            categoryTable.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            categoryTable.getTableHeader().setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Add double-click listener for editing
         categoryTable.addMouseListener(new MouseAdapter() {
@@ -99,11 +145,11 @@ public class CategoryView extends JPanel {
         tablePanel.add(scrollPane, BorderLayout.CENTER);
         
         // Buttons panel (bottom)
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttonsPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
         
-        addButton = new JButton("Add Category");
-        editButton = new JButton("Edit");
-        deleteButton = new JButton("Delete");
+        addButton = new JButton(messages.getString("categories.button.add"));
+        editButton = new JButton(messages.getString("button.edit"));
+        deleteButton = new JButton(messages.getString("button.delete"));
         
         addButton.addActionListener(e -> showCategoryDialog(null));
         editButton.addActionListener(this::onEditButtonClicked);
@@ -157,8 +203,9 @@ public class CategoryView extends JPanel {
             showCategoryDialog(selectedCategory);
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a category to edit.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("error.noSelection"),
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
@@ -170,45 +217,53 @@ public class CategoryView extends JPanel {
             // Check if category is in use
             if (controller.isCategoryInUse(selectedCategory.getId())) {
                 JOptionPane.showMessageDialog(this,
-                    "This category cannot be deleted because it is in use by one or more products.",
-                    "Category In Use",
+                    messages.getString("categories.error.inUse"),
+                    messages.getString("dialog.categoryInUse"),
                     JOptionPane.WARNING_MESSAGE);
                 return;
             }
             
             int confirm = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to delete the category: " + selectedCategory.getName() + "?",
-                "Confirm Deletion",
+                messages.getString("categories.confirm.delete").replace("{0}", selectedCategory.getName()),
+                messages.getString("dialog.confirmDeletion"),
                 JOptionPane.YES_NO_OPTION);
                 
             if (confirm == JOptionPane.YES_OPTION) {
                 boolean success = controller.deleteCategory(selectedCategory.getId());
                 if (success) {
                     JOptionPane.showMessageDialog(this,
-                        "Category deleted successfully.",
-                        "Success",
+                        messages.getString("categories.success.deleted"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     loadAllCategories();
                 } else {
                     JOptionPane.showMessageDialog(this,
-                        "Error deleting category.",
-                        "Error",
+                        messages.getString("categories.error.delete"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             }
         } else {
             JOptionPane.showMessageDialog(this, 
-                "Please select a category to delete.", 
-                "No Selection", JOptionPane.WARNING_MESSAGE);
+                messages.getString("categories.error.selectToDelete"), 
+                messages.getString("dialog.noSelection"), 
+                JOptionPane.WARNING_MESSAGE);
         }
     }
     
     private void showCategoryDialog(Category category) {
         // Create a dialog for adding/editing categories
-        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Category Details");
+        JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), 
+            messages.getString("dialog.categoryDetails"));
         dialog.setLayout(new BorderLayout());
         dialog.setSize(400, 250);
         dialog.setLocationRelativeTo(this);
+        
+        // Apply RTL orientation if needed
+        if (isRightToLeft) {
+            dialog.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            ArabicFontHelper.applyArabicFont(dialog);
+        }
         
         JPanel formPanel = new JPanel(new GridLayout(3, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -216,6 +271,13 @@ public class CategoryView extends JPanel {
         JTextField idField = new JTextField();
         JTextField nameField = new JTextField();
         JTextArea descriptionField = new JTextArea();
+        
+        // Apply RTL to text components if needed
+        if (isRightToLeft) {
+            idField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            nameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            descriptionField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
         
         // Populate fields if editing
         if (category != null) {
@@ -230,11 +292,11 @@ public class CategoryView extends JPanel {
         // ID is not editable
         idField.setEditable(false);
         
-        formPanel.add(new JLabel("ID:"));
+        formPanel.add(new JLabel(messages.getString("column.id") + ":"));
         formPanel.add(idField);
-        formPanel.add(new JLabel("Name:"));
+        formPanel.add(new JLabel(messages.getString("categories.column.name") + ":"));
         formPanel.add(nameField);
-        formPanel.add(new JLabel("Description:"));
+        formPanel.add(new JLabel(messages.getString("categories.column.description") + ":"));
         
         // Use scroll pane for description
         JScrollPane descScrollPane = new JScrollPane(descriptionField);
@@ -242,17 +304,18 @@ public class CategoryView extends JPanel {
         descriptionField.setWrapStyleWord(true);
         formPanel.add(descScrollPane);
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton saveButton = new JButton("Save");
-        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new FlowLayout(isRightToLeft ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        JButton saveButton = new JButton(messages.getString("button.save"));
+        JButton cancelButton = new JButton(messages.getString("button.cancel"));
         
         saveButton.addActionListener(e -> {
             try {
                 // Validate input
                 if (nameField.getText().trim().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog, 
-                        "Name is a required field.", 
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
+                        messages.getString("categories.error.nameRequired"), 
+                        messages.getString("dialog.validationError"), 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
@@ -265,21 +328,22 @@ public class CategoryView extends JPanel {
                 
                 if (success) {
                     JOptionPane.showMessageDialog(dialog,
-                        "Category saved successfully.",
-                        "Success",
+                        messages.getString("categories.success.saved"),
+                        messages.getString("dialog.success"),
                         JOptionPane.INFORMATION_MESSAGE);
                     dialog.dispose();
                     loadAllCategories();
                 } else {
                     JOptionPane.showMessageDialog(dialog,
-                        "Error saving category. Please check your inputs.",
-                        "Error",
+                        messages.getString("categories.error.save"),
+                        messages.getString("dialog.error"),
                         JOptionPane.ERROR_MESSAGE);
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dialog, 
-                    "Please enter valid numeric values.", 
-                    "Input Error", JOptionPane.ERROR_MESSAGE);
+                    messages.getString("error.invalidNumber"), 
+                    messages.getString("dialog.inputError"), 
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         

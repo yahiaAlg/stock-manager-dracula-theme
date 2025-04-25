@@ -2,6 +2,8 @@ package view;
 
 import controller.UserController;
 import model.User;
+import util.LocaleManager;
+import util.ArabicFontHelper;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -9,6 +11,8 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 public class UserManagementView extends JPanel {
     
@@ -19,20 +23,37 @@ public class UserManagementView extends JPanel {
     private JButton editButton;
     private JButton deleteButton;
     private User currentUser;
+    private ResourceBundle messages;
     
     public UserManagementView(UserController userController) {
         this.userController = userController;
+        
+        // Get the resource bundle for the current locale
+        messages = ResourceBundle.getBundle("resources.Messages", LocaleManager.getCurrentLocale());
         
         setLayout(new BorderLayout());
         
         initComponents();
         setupLayout();
         refreshData();
+        
+        // Apply RTL orientation for Arabic
+        if (LocaleManager.getCurrentLocale().getLanguage().equals("ar")) {
+            applyRTLOrientation();
+        }
     }
     
     private void initComponents() {
         // Create table model with column names
-        String[] columnNames = {"ID", "Username", "Email", "Full Name", "Role", "Active"};
+        String[] columnNames = {
+            messages.getString("user.column.id"),
+            messages.getString("user.column.username"),
+            messages.getString("user.column.email"),
+            messages.getString("user.column.fullName"),
+            messages.getString("user.column.role"),
+            messages.getString("user.column.active")
+        };
+        
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -45,9 +66,9 @@ public class UserManagementView extends JPanel {
         userTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         
         // Create buttons
-        addButton = new JButton("Add User");
-        editButton = new JButton("Edit User");
-        deleteButton = new JButton("Delete User");
+        addButton = new JButton(messages.getString("user.addUser"));
+        editButton = new JButton(messages.getString("user.editUser"));
+        deleteButton = new JButton(messages.getString("user.deleteUser"));
         
         // Add action listeners
         addButton.addActionListener(new ActionListener() {
@@ -67,8 +88,8 @@ public class UserManagementView extends JPanel {
                     showUserDialog(user);
                 } else {
                     JOptionPane.showMessageDialog(UserManagementView.this,
-                            "Please select a user to edit.",
-                            "No Selection",
+                            messages.getString("user.selectToEdit"),
+                            messages.getString("dialog.noSelection"),
                             JOptionPane.WARNING_MESSAGE);
                 }
             }
@@ -84,16 +105,16 @@ public class UserManagementView extends JPanel {
                     // Check if user is trying to delete themselves
                     if (currentUser != null && userId == currentUser.getId()) {
                         JOptionPane.showMessageDialog(UserManagementView.this,
-                                "You cannot delete your own account.",
-                                "Action Denied",
+                                messages.getString("user.cannotDeleteSelf"),
+                                messages.getString("dialog.error"),
                                 JOptionPane.ERROR_MESSAGE);
                         return;
                     }
                     
                     int choice = JOptionPane.showConfirmDialog(
                             UserManagementView.this,
-                            "Are you sure you want to deactivate this user?",
-                            "Confirm Deactivation",
+                            messages.getString("user.confirmDeactivate"),
+                            messages.getString("dialog.confirmDeletion"),
                             JOptionPane.YES_NO_OPTION);
                     
                     if (choice == JOptionPane.YES_OPTION) {
@@ -101,15 +122,15 @@ public class UserManagementView extends JPanel {
                             refreshData();
                         } else {
                             JOptionPane.showMessageDialog(UserManagementView.this,
-                                    "Failed to deactivate user.",
-                                    "Operation Failed",
+                                    messages.getString("user.failedToDeactivate"),
+                                    messages.getString("title.operationFailed"),
                                     JOptionPane.ERROR_MESSAGE);
                         }
                     }
                 } else {
                     JOptionPane.showMessageDialog(UserManagementView.this,
-                            "Please select a user to deactivate.",
-                            "No Selection",
+                            messages.getString("user.selectToDelete"),
+                            messages.getString("dialog.noSelection"),
                             JOptionPane.WARNING_MESSAGE);
                 }
             }
@@ -130,6 +151,18 @@ public class UserManagementView extends JPanel {
         add(buttonPanel, BorderLayout.SOUTH);
     }
     
+    private void applyRTLOrientation() {
+        // Apply Arabic font
+        ArabicFontHelper.applyArabicFont(this);
+        
+        // Set component orientation for RTL display
+        this.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        userTable.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        
+        // For RTL languages, adjust button panel alignment if needed
+        ((FlowLayout) ((JPanel) getComponent(1)).getLayout()).setAlignment(FlowLayout.LEFT);
+    }
+    
     public void refreshData() {
         // Clear the table
         tableModel.setRowCount(0);
@@ -144,10 +177,19 @@ public class UserManagementView extends JPanel {
                     user.getUsername(),
                     user.getEmail(),
                     user.getFullName(),
-                    user.getRole(),
+                    translateRole(user.getRole()),
                     user.isActive()
             };
             tableModel.addRow(rowData);
+        }
+    }
+    
+    private String translateRole(String role) {
+        // Translate user roles according to the current locale
+        if (role.equalsIgnoreCase("Admin")) {
+            return messages.getString("role.admin");
+        } else {
+            return messages.getString("role.user");
         }
     }
     
@@ -189,10 +231,15 @@ public class UserManagementView extends JPanel {
         private User user;
         private boolean isNewUser;
         private boolean dataChanged = false;
+        private ResourceBundle messages;
         
         public UserDialog(Window parent, User user) {
-            super(parent, user == null ? "Add User" : "Edit User", ModalityType.APPLICATION_MODAL);
+            super(parent, user == null ? 
+                ResourceBundle.getBundle("resources.Messages", LocaleManager.getCurrentLocale()).getString("user.addUser") : 
+                ResourceBundle.getBundle("resources.Messages", LocaleManager.getCurrentLocale()).getString("user.editUser"), 
+                ModalityType.APPLICATION_MODAL);
             
+            this.messages = ResourceBundle.getBundle("resources.Messages", LocaleManager.getCurrentLocale());
             this.user = user;
             this.isNewUser = (user == null);
             
@@ -207,6 +254,11 @@ public class UserManagementView extends JPanel {
             setSize(400, 350);
             setLocationRelativeTo(parent);
             setResizable(false);
+            
+            // Apply RTL for Arabic
+            if (LocaleManager.getCurrentLocale().getLanguage().equals("ar")) {
+                applyRTLOrientation();
+            }
         }
         
         private void initComponents() {
@@ -215,14 +267,17 @@ public class UserManagementView extends JPanel {
             emailField = new JTextField(20);
             fullNameField = new JTextField(20);
             
-            String[] roles = {"User", "Admin"};
+            String[] roles = {
+                messages.getString("role.user"), 
+                messages.getString("role.admin")
+            };
             roleComboBox = new JComboBox<>(roles);
             
-            activeCheckBox = new JCheckBox("Active");
+            activeCheckBox = new JCheckBox(messages.getString("label.active"));
             activeCheckBox.setSelected(true);
             
-            saveButton = new JButton("Save");
-            cancelButton = new JButton("Cancel");
+            saveButton = new JButton(messages.getString("button.save"));
+            cancelButton = new JButton(messages.getString("button.cancel"));
             statusLabel = new JLabel(" ");
             statusLabel.setForeground(Color.RED);
             
@@ -260,7 +315,7 @@ public class UserManagementView extends JPanel {
             // Username row
             gc.gridx = 0;
             gc.gridy = 0;
-            formPanel.add(new JLabel("Username:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.username")), gc);
             
             gc.gridx = 1;
             gc.gridy = 0;
@@ -269,7 +324,7 @@ public class UserManagementView extends JPanel {
             // Password row
             gc.gridx = 0;
             gc.gridy = 1;
-            formPanel.add(new JLabel("Password:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.password")), gc);
             
             gc.gridx = 1;
             gc.gridy = 1;
@@ -278,7 +333,7 @@ public class UserManagementView extends JPanel {
             // Email row
             gc.gridx = 0;
             gc.gridy = 2;
-            formPanel.add(new JLabel("Email:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.email")), gc);
             
             gc.gridx = 1;
             gc.gridy = 2;
@@ -287,7 +342,7 @@ public class UserManagementView extends JPanel {
             // Full Name row
             gc.gridx = 0;
             gc.gridy = 3;
-            formPanel.add(new JLabel("Full Name:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.fullName")), gc);
             
             gc.gridx = 1;
             gc.gridy = 3;
@@ -296,7 +351,7 @@ public class UserManagementView extends JPanel {
             // Role row
             gc.gridx = 0;
             gc.gridy = 4;
-            formPanel.add(new JLabel("Role:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.role")), gc);
             
             gc.gridx = 1;
             gc.gridy = 4;
@@ -305,7 +360,7 @@ public class UserManagementView extends JPanel {
             // Active row
             gc.gridx = 0;
             gc.gridy = 5;
-            formPanel.add(new JLabel("Status:"), gc);
+            formPanel.add(new JLabel(messages.getString("label.status")), gc);
             
             gc.gridx = 1;
             gc.gridy = 5;
@@ -331,12 +386,34 @@ public class UserManagementView extends JPanel {
             add(mainPanel);
         }
         
+        private void applyRTLOrientation() {
+            // Apply Arabic font
+            ArabicFontHelper.applyArabicFont(this);
+            
+            // Set component orientation for RTL display
+            this.applyComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            
+            // Adjust text fields for right-to-left input
+            usernameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            passwordField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            emailField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            fullNameField.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            roleComboBox.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+        }
+        
         private void populateFields() {
             if (!isNewUser) {
                 usernameField.setText(user.getUsername());
                 emailField.setText(user.getEmail());
                 fullNameField.setText(user.getFullName());
-                roleComboBox.setSelectedItem(user.getRole());
+                
+                // Match the role with the translated version
+                if (user.getRole().equalsIgnoreCase("Admin")) {
+                    roleComboBox.setSelectedItem(messages.getString("role.admin"));
+                } else {
+                    roleComboBox.setSelectedItem(messages.getString("role.user"));
+                }
+                
                 activeCheckBox.setSelected(user.isActive());
             }
         }
@@ -347,17 +424,26 @@ public class UserManagementView extends JPanel {
             String password = new String(passwordField.getPassword());
             String email = emailField.getText().trim();
             String fullName = fullNameField.getText().trim();
-            String role = (String) roleComboBox.getSelectedItem();
+            String selectedRole = (String) roleComboBox.getSelectedItem();
+            
+            // Convert localized role back to English for database storage
+            String role;
+            if (selectedRole.equals(messages.getString("role.admin"))) {
+                role = "Admin";
+            } else {
+                role = "User";
+            }
+            
             boolean active = activeCheckBox.isSelected();
             
             // Validate inputs
             if (username.isEmpty() || (!isNewUser && password.isEmpty()) || email.isEmpty() || fullName.isEmpty()) {
-                statusLabel.setText("All fields are required");
+                statusLabel.setText(messages.getString("user.allFieldsRequired"));
                 return;
             }
             
             if (isNewUser && password.length() < 6) {
-                statusLabel.setText("Password must be at least 6 characters");
+                statusLabel.setText(messages.getString("user.passwordMinLength"));
                 return;
             }
             
@@ -383,7 +469,7 @@ public class UserManagementView extends JPanel {
                 dataChanged = true;
                 dispose();
             } else {
-                statusLabel.setText("Failed to save user");
+                statusLabel.setText(messages.getString("user.failedToSave"));
             }
         }
         
