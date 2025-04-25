@@ -413,7 +413,7 @@ public class ProductView extends JPanel {
     private void showStockAdjustmentDialog(Product product) {
         JDialog dialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Adjust Stock");
         dialog.setLayout(new BorderLayout());
-        dialog.setSize(350, 250);
+        dialog.setSize(550, 250);
         dialog.setLocationRelativeTo(this);
         
         JPanel formPanel = new JPanel(new GridLayout(5, 2, 10, 10));
