@@ -28,7 +28,7 @@ public class ArabicFontHelper {
         // If we couldn't load the custom font, use a system font suitable for Arabic
         if (arabicFont == null) {
             // Try some common fonts that support Arabic
-            String[] arabicFontNames = {"Traditional Arabic", "Arabic Typesetting", "Simplified Arabic", "Tahoma"};
+            String[] arabicFontNames = {"Noto Sans Arabic", "Arabic Typesetting", "Simplified Arabic", "Tahoma"};
             
             for (String fontName : arabicFontNames) {
                 Font testFont = new Font(fontName, Font.PLAIN, 14);
@@ -53,8 +53,9 @@ public class ArabicFontHelper {
     private static void initializeFont() {
         try {
             // Try to load the Amiri font from resources
-            InputStream is = ArabicFontHelper.class.getResourceAsStream("/resources/fonts/Amiri-Regular.ttf");
+            InputStream is = ArabicFontHelper.class.getResourceAsStream("/fonts/NotoSansArabic-Regular.ttf");
             if (is != null) {
+                System.err.println("font not found");
                 arabicFont = Font.createFont(Font.TRUETYPE_FONT, is);
                 arabicFont = arabicFont.deriveFont(Font.PLAIN, 14);
                 
