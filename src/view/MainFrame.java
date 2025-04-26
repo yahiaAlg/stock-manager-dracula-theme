@@ -1,7 +1,9 @@
 package view;
-
+import com.formdev.flatlaf.intellijthemes.FlatDarkFlatIJTheme;
 import javax.swing.*;
-
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.Properties;
 import controller.*;
 import model.User;
 import java.awt.*;
@@ -19,6 +21,7 @@ import java.sql.Statement;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import javax.swing.border.EmptyBorder;
+
 import util.DBConnection;
 import util.LocaleManager;
 
@@ -454,11 +457,13 @@ public class MainFrame extends JFrame {
         JMenuItem importSamplesMenuItem = new JMenuItem(messages.getString("menu.importSamples"));
         JMenuItem clearDatabaseMenuItem = new JMenuItem(messages.getString("menu.clearDatabase"));
         JMenuItem languageMenuItem = new JMenuItem(messages.getString("menu.language"));
+        JMenuItem themeMenuItem = new JMenuItem(messages.getString("menu.theme"));
         JMenuItem exitMenuItem = new JMenuItem(messages.getString("menu.exit"));
         
         importSamplesMenuItem.addActionListener(e -> importSampleData());
         clearDatabaseMenuItem.addActionListener(e -> clearDatabase());
         languageMenuItem.addActionListener(e -> showLanguageDialog());
+        themeMenuItem.addActionListener(e -> showThemeDialog());
         exitMenuItem.addActionListener(e -> {
             DBConnection.closeConnection();
             System.exit(0);
@@ -467,6 +472,7 @@ public class MainFrame extends JFrame {
         fileMenu.add(importSamplesMenuItem);
         fileMenu.add(clearDatabaseMenuItem);
         fileMenu.add(languageMenuItem);
+        fileMenu.add(themeMenuItem);
         fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         
@@ -499,7 +505,6 @@ public class MainFrame extends JFrame {
         // Set the menu bar
         setJMenuBar(menuBar);
     }
-
     // Helper method to determine the index of the current language
     private int getLanguageIndex(Locale locale) {
         String language = locale.getLanguage();
@@ -509,6 +514,7 @@ public class MainFrame extends JFrame {
             default: return 0; // English is default
         }
     }
+    
     private void showLanguageDialog() {
         String[] languages = {
             messages.getString("language.english"),
@@ -549,6 +555,116 @@ public class MainFrame extends JFrame {
                 );
             }
         }
+    }
+    
+    private void showThemeDialog() {
+        String[] themes = {
+            "FlatIntelliJLaf",
+            "FlatDarkFlatIJTheme",
+            "FlatLightFlatIJTheme",
+            "FlatDraculaIJTheme",
+            "FlatArcIJTheme",
+            "FlatArcOrangeIJTheme",
+            "FlatArcDarkOrangeIJTheme",
+            "FlatCarbonIJTheme",
+            "FlatCyanLightIJTheme",
+            "FlatDarkPurpleIJTheme",
+            "FlatSolarizedDarkIJTheme"
+        };
+        
+        String currentTheme = loadThemePreference();
+        
+        String selectedTheme = (String) JOptionPane.showInputDialog(
+            this,
+            messages.getString("dialog.selectTheme"),
+            messages.getString("title.theme"),
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            themes,
+            getThemeDisplayName(currentTheme)
+        );
+        
+        if (selectedTheme != null) {
+            String themeClass = getThemeClassName(selectedTheme);
+            
+            try {
+                // Save the selected theme to properties
+                saveThemePreference(themeClass);
+                
+                // Inform user to restart application
+                JOptionPane.showMessageDialog(
+                    this,
+                    messages.getString("info.restartRequired"),
+                    messages.getString("title.themeChanged"),
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(
+                    this,
+                    messages.getString("error.themeChange") + ex.getMessage(),
+                    messages.getString("title.themeFailed"),
+                    JOptionPane.ERROR_MESSAGE
+                );
+            }
+        }
+    }
+
+
+    private String getThemeClassName(String displayName) {
+        return "com.formdev.flatlaf.intellijthemes." + displayName;
+    }
+
+    private String getThemeDisplayName(String className) {
+        // Extract just the class name without package
+        if (className.contains(".")) {
+            String[] parts = className.split("\\.");
+            return parts[parts.length - 1];
+        }
+        return className;
+    }
+    // Add this method to save the theme preference
+    private void saveThemePreference(String themeClass) {
+        try {
+            Properties props = new Properties();
+            File configFile = new File("config.properties");
+            
+            // Load existing properties if file exists
+            if (configFile.exists()) {
+                try (FileInputStream fis = new FileInputStream(configFile)) {
+                    props.load(fis);
+                }
+            }
+            
+            // Set the theme property
+            props.setProperty("app.theme", themeClass);
+            
+            // Save properties
+            try (FileOutputStream fos = new FileOutputStream(configFile)) {
+                props.store(fos, "Application Settings");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to save theme preference: " + e.getMessage());
+        }
+    }
+
+    // Add this static method to load the theme
+    public static String loadThemePreference() {
+        Properties props = new Properties();
+        File configFile = new File("config.properties");
+        
+        if (configFile.exists()) {
+            try (FileInputStream fis = new FileInputStream(configFile)) {
+                props.load(fis);
+                String theme = props.getProperty("app.theme");
+                return theme != null ? theme : "com.formdev.flatlaf.FlatIntelliJLaf"; // Default theme
+            } catch (IOException e) {
+                e.printStackTrace();
+                return "com.formdev.flatlaf.FlatIntelliJLaf"; // Default theme
+            }
+        }
+        return "com.formdev.flatlaf.FlatIntelliJLaf"; // Default theme
     }
     
     private void showUserProfileDialog() {
@@ -668,12 +784,20 @@ public class MainFrame extends JFrame {
         }
     }
 
+    // Modify the main method to load and apply the theme
     public static void main(String[] args) {
-        // Set system look and feel
+        // Set system look and feel using the saved theme preference
         try {
-            UIManager.setLookAndFeel("com.formdev.flatlaf.FlatIntelliJLaf");
+            String themeClass = loadThemePreference();
+            UIManager.setLookAndFeel(themeClass);
         } catch (Exception e) {
             e.printStackTrace();
+            // Fallback to default theme
+            try {
+                UIManager.setLookAndFeel("com.formdev.flatlaf.FlatIntelliJLaf");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
         
         // Load database
@@ -685,7 +809,7 @@ public class MainFrame extends JFrame {
             loginView.setVisible(true);
         });
     }
-    
+
     // Inner class for user profile dialog
     class UserProfileDialog extends JDialog {
         
